@@ -46,3 +46,17 @@ class FileBody(BaseModel):
 
 class TextBody(BaseModel):
     content: str
+
+
+class FileRule(BaseModel):
+    paths: list[str]
+    operations: list[Literal["read", "write"]] = ["write"]
+    access: Literal["allow", "ask", "deny"] = "ask"
+
+
+class RulesBody(BaseModel):
+    # Either the raw YAML text...
+    content: str | None = None
+    # ...or the structured form the rules screen edits.
+    files: list[FileRule] | None = None
+    tools: dict[str, Literal["allow", "ask", "deny"]] | None = None

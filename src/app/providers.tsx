@@ -6,16 +6,6 @@ import { Direction, Tooltip } from 'radix-ui';
 import { useEffect } from 'react';
 import { Toaster } from 'sonner';
 
-declare global {
-  interface Window {
-    desktop?: {
-      isDesktop: boolean;
-      platform: string;
-      setTheme: (theme: 'light' | 'dark') => void;
-    };
-  }
-}
-
 /** Marks the document when running inside Electron and keeps the native
  *  window-control overlay in step with the app theme. */
 function DesktopBridge() {

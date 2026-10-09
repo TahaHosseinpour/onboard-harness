@@ -53,7 +53,7 @@ def _kill_tree(process: subprocess.Popen[str]) -> None:
     if process.poll() is not None:
         return
     if sys.platform == "win32":
-        subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True, check=False)  # noqa: S603, S607
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True, check=False, creationflags=subprocess.CREATE_NO_WINDOW)  # noqa: S603, S607
     else:
         os.killpg(os.getpgid(process.pid), signal.SIGKILL)
 
@@ -108,7 +108,8 @@ class GuardedShellBackend(LocalShellBackend):
             cwd=str(self.cwd),
             # Its own process group, so the whole tree can be ended, not just the shell.
             start_new_session=not windows,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if windows else 0,
+            # No console window of its own: the engine runs hidden behind the desktop app.
+            creationflags=(subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW) if windows else 0,
         )
         self._running.add(process)
         try:

@@ -9,12 +9,13 @@ import yaml
 from fastapi import APIRouter, HTTPException, Request
 
 from harness.memory import read_memory, write_memory
+from harness.permissions import load_rules
 from harness.skills import list_skills
 from harness.subagents import list_agents
 from harness.workspace import HARNESS_DIR, Workspace
 
 from .. import settings
-from ..schemas import FileBody, OpenWorkspace, TextBody
+from ..schemas import FileBody, OpenWorkspace, RulesBody, TextBody
 from ..state import AppState
 
 router = APIRouter(tags=["workspace"])
@@ -62,7 +63,8 @@ def list_files(request: Request, system: bool = False) -> list[dict[str, Any]]:
         if not file.is_file() or (is_system and (not system or relative.parts[1:2] in (("runs",), ("artifacts",)) or file.name.startswith("state.db"))):
             continue
         stat = file.stat()
-        entries.append({"path": "/" + relative.as_posix(), "name": file.name, "folder": "/" + relative.parent.as_posix().strip("."), "size": stat.st_size, "modified": stat.st_mtime, "system": is_system})
+        folder = "/" if relative.parent == Path(".") else "/" + relative.parent.as_posix()
+        entries.append({"path": "/" + relative.as_posix(), "name": file.name, "folder": folder, "size": stat.st_size, "modified": stat.st_mtime, "system": is_system})
     return entries
 
 
@@ -107,16 +109,24 @@ def put_memory(body: TextBody, request: Request) -> dict[str, bool]:
 
 
 @router.get("/rules")
-def get_rules(request: Request) -> dict[str, str]:
+def get_rules(request: Request) -> dict[str, Any]:
+    """The rules both as the raw file and as structured data the UI can edit."""
     file = _state(request).workspace.rules_file
-    return {"content": file.read_text(encoding="utf-8") if file.exists() else ""}
+    return {"content": file.read_text(encoding="utf-8") if file.exists() else "", **load_rules(file)}
 
 
 @router.put("/rules")
-def put_rules(body: TextBody, request: Request) -> dict[str, bool]:
-    try:
-        yaml.safe_load(body.content)
-    except yaml.YAMLError as error:
-        raise HTTPException(status_code=400, detail=f"Rules are not valid YAML: {error}") from error
-    _state(request).workspace.rules_file.write_text(body.content, encoding="utf-8")
+def put_rules(body: RulesBody, request: Request) -> dict[str, bool]:
+    """Save rules, given either as the raw YAML text or as structured `files` and `tools`."""
+    file = _state(request).workspace.rules_file
+    if body.content is not None:
+        try:
+            yaml.safe_load(body.content)
+        except yaml.YAMLError as error:
+            raise HTTPException(status_code=400, detail=f"Rules are not valid YAML: {error}") from error
+        file.write_text(body.content, encoding="utf-8")
+        return {"saved": True}
+    header = "\n".join(["# What agents may do in this workspace.", "# access: allow (just do it) | ask (pause for approval) | deny (never)", "# The first matching rule wins.", ""])
+    data = {"files": [rule.model_dump() for rule in body.files or []], "tools": body.tools or {}}
+    file.write_text(header + yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
     return {"saved": True}

@@ -3,9 +3,9 @@
 // 1. exports the UI as static files (out/)
 // 2. stages a minimal app folder (Electron shell + out/) so the installer does
 //    not carry the web toolchain in node_modules
-// 3. packages it with electron-builder into release/dist/
-//
-// The Python backend is not bundled; see backend/README.md.
+// 3. packages it with electron-builder into release/dist/, together with the
+//    frozen engine from backend/dist/harness-server (built on demand, or pass
+//    --engine to rebuild it)
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,6 +19,9 @@ function run(command, args, env = {}) {
   const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', env: { ...process.env, ...env } });
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
+
+const engine = path.join(root, 'backend', 'dist', 'harness-server', 'harness-server.exe');
+if (process.argv.includes('--engine') || !fs.existsSync(engine)) run(process.execPath, [path.join(__dirname, 'build-engine.cjs')]);
 
 run(process.execPath, [nextBin, 'build'], { DESKTOP_EXPORT: '1' });
 

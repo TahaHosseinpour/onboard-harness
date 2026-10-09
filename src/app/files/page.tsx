@@ -1,252 +1,142 @@
 'use client';
 
 import {
-  ArrowCounterClockwiseIcon,
   ArrowRightIcon,
-  BrainIcon,
-  ChartBarIcon,
-  ClockCounterClockwiseIcon,
+  ArrowSquareOutIcon,
+  FileCsvIcon,
   FileDocIcon,
+  FileIcon,
   FilePdfIcon,
   FilePptIcon,
+  FileTextIcon,
   FileXlsIcon,
-  FolderOpenIcon,
+  FloppyDiskIcon,
   FolderSimpleIcon,
   GearFineIcon,
   HardDrivesIcon,
   ImageIcon,
-  LightningIcon,
-  ListIcon,
   MagnifyingGlassIcon,
-  RobotIcon,
-  ShieldCheckIcon,
-  SparkleIcon,
-  SquaresFourIcon,
-  UploadSimpleIcon,
-  WrenchIcon,
-  XIcon,
   type Icon,
 } from '@phosphor-icons/react';
-import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import { SalesColumns, SlideDeck } from '@/components/shared/viewers';
 import { PageHeader } from '@/components/shell/page';
 import { Button } from '@/components/ui/button';
-import { EmptyNote, MetaDot, navRow, subNav, Table, TBody, Td, Th, THead, Tr } from '@/components/ui/patterns';
-import { Badge, Hint, Input, Segmented, Switch } from '@/components/ui/primitives';
-import { files, folderPath, folders, systemFiles, systemFolders, versions, workspace, type FileItem, type FileKind, type SystemKind } from '@/lib/mock';
+import { EmptyNote, navRow, subNav, Table, TBody, Td, Th, THead, Tr } from '@/components/ui/patterns';
+import { Badge, Input, Switch } from '@/components/ui/primitives';
+import { api, ApiError, type FileEntry } from '@/lib/api';
+import { useBackend } from '@/lib/backend';
 import { useUi } from '@/lib/store';
 import { cn, fa } from '@/lib/utils';
 
-// Editors are heavy and browser-only; load them when a file is opened.
-const DocEditor = dynamic(() => import('@/components/documents/doc-editor').then((m) => m.DocEditor), { ssr: false });
-const SheetEditor = dynamic(() => import('@/components/documents/sheet-editor').then((m) => m.SheetEditor), { ssr: false });
-
-const kindMeta: Record<Exclude<FileKind, 'folder'>, { icon: Icon; label: string; color: string }> = {
-  doc: { icon: FileDocIcon, label: 'سند Word', color: 'text-info' },
-  sheet: { icon: FileXlsIcon, label: 'جدول Excel', color: 'text-success' },
-  slides: { icon: FilePptIcon, label: 'اسلاید', color: 'text-warning' },
+const TEXT = new Set(['md', 'txt', 'csv', 'json', 'yaml', 'yml', 'py', 'js', 'ts', 'html', 'css', 'log', 'xml', 'ini']);
+const kinds: Record<string, { icon: Icon; label: string; color: string }> = {
+  md: { icon: FileTextIcon, label: 'متن', color: 'text-info' },
+  txt: { icon: FileTextIcon, label: 'متن', color: 'text-muted-foreground' },
+  csv: { icon: FileCsvIcon, label: 'جدول CSV', color: 'text-success' },
+  xlsx: { icon: FileXlsIcon, label: 'جدول Excel', color: 'text-success' },
+  docx: { icon: FileDocIcon, label: 'سند Word', color: 'text-info' },
+  pptx: { icon: FilePptIcon, label: 'اسلاید', color: 'text-warning' },
   pdf: { icon: FilePdfIcon, label: 'PDF', color: 'text-danger' },
-  image: { icon: ImageIcon, label: 'تصویر', color: 'text-chart-2' },
+  png: { icon: ImageIcon, label: 'تصویر', color: 'text-chart-2' },
+  jpg: { icon: ImageIcon, label: 'تصویر', color: 'text-chart-2' },
 };
+const ext = (name: string) => name.split('.').pop()?.toLowerCase() ?? '';
+const kindOf = (name: string) => kinds[ext(name)] ?? { icon: FileIcon, label: ext(name).toUpperCase() || 'فایل', color: 'text-muted-foreground' };
 
-const metaOf = (file: FileItem) => kindMeta[file.kind as Exclude<FileKind, 'folder'>];
-
-function PdfViewer({ file }: { file: FileItem }) {
-  return (
-    <div className="bg-surface scrollbar-minimal h-full overflow-y-auto px-6 py-8">
-      {[1, 2].map((page) => (
-        <div key={page} className="bg-background shadow-float mx-auto mb-6 aspect-[1/1.414] max-w-[640px] rounded-md border p-12">
-          <div className="text-lg font-semibold">{file.name}</div>
-          <div className="text-muted-foreground mt-1 text-xs">صفحهٔ {page.toLocaleString('fa-IR')} از ۲</div>
-          <div className="mt-8 space-y-3">
-            {Array.from({ length: 14 }).map((_, i) => (
-              <div key={i} className="bg-secondary h-2.5 rounded-full" style={{ width: `${62 + ((i * 37 + page * 11) % 38)}%` }} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+function size(bytes: number) {
+  if (bytes < 1024) return `${fa(bytes)} بایت`;
+  if (bytes < 1024 * 1024) return `${fa(Math.round(bytes / 1024))} کیلوبایت`;
+  return `${fa(bytes / 1024 / 1024, 1)} مگابایت`;
 }
+const when = (seconds: number) => new Intl.DateTimeFormat('fa-IR-u-ca-persian', { dateStyle: 'medium', timeStyle: 'short' }).format(seconds * 1000);
 
-function ImageViewer() {
-  return (
-    <div className="bg-surface flex h-full items-center justify-center p-8">
-      <div className="bg-background shadow-float w-full max-w-3xl rounded-lg border p-6">
-        <div className="mb-3 text-sm font-medium">نمودار فروش منطقه‌ای · PNG</div>
-        <SalesColumns height={340} />
-      </div>
-    </div>
-  );
-}
+/** One file: text files open in an editor and save back; anything else opens in its own program. */
+function FileView({ path, onBack }: { path: string; onBack: () => void }) {
+  const root = useBackend((s) => s.workspace?.path ?? '');
+  const [content, setContent] = useState<string | null>(null);
+  const [saved, setSaved] = useState('');
+  const [binary, setBinary] = useState(!TEXT.has(ext(path)));
+  const name = path.split('/').pop() ?? path;
+  const meta = kindOf(name);
 
-function Versions({ onClose }: { onClose: () => void }) {
-  return (
-    <aside className="bg-surface/60 flex w-[300px] shrink-0 flex-col border-s">
-      <div className="flex h-10 shrink-0 items-center justify-between border-b px-3.5">
-        <span className="text-sm font-semibold">تاریخچهٔ نسخه‌ها</span>
-        <Button variant="muted" size="icon-xs" onClick={onClose} aria-label="بستن">
-          <XIcon />
-        </Button>
-      </div>
-      <ol className="scrollbar-minimal min-h-0 flex-1 overflow-y-auto p-2">
-        {versions.map((version) => (
-          <li key={version.id} className={cn('group rounded-md px-3 py-2.5', version.current ? 'bg-primary-soft/60' : 'hover:bg-hover')}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">{version.label}</span>
-              {version.current ? (
-                <Badge tone="primary">فعلی</Badge>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="xs"
-                  className="opacity-0 group-hover:opacity-100"
-                  onClick={() => toast.success(`${version.label} بازگردانی شد`, { description: 'نسخهٔ فعلی به‌عنوان نسخهٔ جدید نگه داشته شد.' })}
-                >
-                  <ArrowCounterClockwiseIcon /> بازگردانی
-                </Button>
-              )}
-            </div>
-            <p className="mt-1 text-xs leading-5">{version.note}</p>
-            <div className="text-muted-foreground mt-1 flex items-center gap-1.5 text-xs">
-              <span>{version.by}</span>
-              <MetaDot />
-              <span>{version.when}</span>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </aside>
-  );
-}
+  useEffect(() => {
+    if (binary) return;
+    api
+      .get<{ content: string }>(`/files/content?path=${encodeURIComponent(path)}`)
+      .then((file) => {
+        setContent(file.content);
+        setSaved(file.content);
+      })
+      .catch((e) => (e instanceof ApiError && e.status === 415 ? setBinary(true) : toast.error('خواندن فایل ممکن نشد.')));
+  }, [path, binary]);
 
-function FileView({ file, onBack }: { file: FileItem; onBack: () => void }) {
-  const [showVersions, setShowVersions] = useState(false);
-  const meta = metaOf(file);
+  const save = async () => {
+    if (content === null) return;
+    try {
+      await api.put('/files/content', { path, content });
+      setSaved(content);
+      toast.success('ذخیره شد.');
+    } catch {
+      toast.error('ذخیره ممکن نشد.');
+    }
+  };
+  const openOutside = () => (window.desktop?.openPath ? window.desktop.openPath(`${root}${path.replaceAll('/', '\\')}`) : toast('باز کردن با برنامه‌های دیگر فقط در برنامهٔ دسکتاپ ممکن است.'));
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-14 shrink-0 items-center gap-2 border-b px-3">
-        <Hint label="بازگشت به فایل‌ها">
-          <Button variant="muted" size="icon-sm" onClick={onBack} aria-label="بازگشت">
-            <ArrowRightIcon />
-          </Button>
-        </Hint>
+        <Button variant="muted" size="icon-sm" onClick={onBack} aria-label="بازگشت">
+          <ArrowRightIcon />
+        </Button>
         <meta.icon weight="fill" className={cn('size-5 shrink-0', meta.color)} />
-        <div className="min-w-0 flex-1 truncate text-base font-semibold">{file.name}</div>
-        <div className="text-muted-foreground hidden items-center gap-1.5 text-xs lg:flex">
-          <span className="ltr-nums">{folderPath[file.folder]}</span>
-            <MetaDot />
-            <span>ذخیره شد · {file.modified}</span>
-        </div>
-        <Button variant={showVersions ? 'soft' : 'outline'} size="sm" onClick={() => setShowVersions((v) => !v)}>
-          <ClockCounterClockwiseIcon /> نسخه‌ها
+        <div className="ltr-nums min-w-0 flex-1 truncate text-end font-mono text-sm" dir="ltr">{path}</div>
+        <Button variant="outline" size="sm" onClick={openOutside}>
+          <ArrowSquareOutIcon /> باز کردن با برنامهٔ سیستم
         </Button>
-        <Button size="sm">
-          <SparkleIcon weight="fill" /> از ایجنت بخواه
-        </Button>
+        {!binary && (
+          <Button size="sm" disabled={content === saved} onClick={save}>
+            <FloppyDiskIcon /> ذخیره
+          </Button>
+        )}
       </div>
-      <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1">
-          {file.kind === 'doc' && <DocEditor />}
-          {file.kind === 'sheet' && <SheetEditor />}
-          {file.kind === 'slides' && (
-            <div className="bg-surface scrollbar-minimal h-full overflow-y-auto p-8">
-              <SlideDeck className="mx-auto max-w-4xl" />
-            </div>
-          )}
-          {file.kind === 'pdf' && <PdfViewer file={file} />}
-          {file.kind === 'image' && <ImageViewer />}
-        </div>
-        {showVersions && <Versions onClose={() => setShowVersions(false)} />}
-      </div>
+      {binary ? (
+        <EmptyNote icon={<meta.icon />} title="این فایل داخل برنامه نمایش داده نمی‌شود">
+          {meta.label} را با «باز کردن با برنامهٔ سیستم» ببینید. ایجنت‌ها می‌توانند جدول‌های Excel و CSV را بخوانند.
+        </EmptyNote>
+      ) : (
+        <textarea
+          value={content ?? ''}
+          onChange={(e) => setContent(e.target.value)}
+          dir="auto"
+          spellCheck={false}
+          className="scrollbar-minimal min-h-0 flex-1 resize-none bg-transparent px-8 py-6 font-mono text-sm leading-7 outline-none"
+        />
+      )}
     </div>
   );
 }
 
-const systemMeta: Record<SystemKind, { icon: Icon; label: string }> = {
-  dashboard: { icon: ChartBarIcon, label: 'داشبورد' },
-  agent: { icon: RobotIcon, label: 'ایجنت' },
-  skill: { icon: WrenchIcon, label: 'مهارت' },
-  rule: { icon: ShieldCheckIcon, label: 'قانون' },
-  automation: { icon: LightningIcon, label: 'اتوماسیون' },
-  memory: { icon: BrainIcon, label: 'دانش' },
-};
-
-/** One row of the browser, whether a document the user made or a file the harness keeps for itself. */
-type Entry = {
-  id: string;
-  name: string;
-  /** Path of the containing folder, relative to the workspace root. */
-  dir: string;
-  folder: string;
-  typeLabel: string;
-  icon: Icon;
-  color: string;
-  size: string;
-  modified: string;
-  by: string;
-  system: boolean;
-  open: () => void;
-};
-
+/** The workspace folder as it is on disk. Harness files (.harness) appear only when asked for. */
 export default function FilesPage() {
-  const router = useRouter();
-  const openFileId = useUi((s) => s.openFileId);
+  const workspace = useBackend((s) => s.workspace);
+  const openFile = useUi((s) => s.openFile);
   const setOpenFile = useUi((s) => s.setOpenFile);
-  const [folder, setFolder] = useState<string>('all');
-  const [view, setView] = useState<'list' | 'grid'>('list');
-  const [query, setQuery] = useState('');
+  const [entries, setEntries] = useState<FileEntry[]>([]);
   const [showSystem, setShowSystem] = useState(false);
+  const [folder, setFolder] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
-  const openFile = files.find((f) => f.id === openFileId);
-  if (openFile) return <FileView file={openFile} onBack={() => setOpenFile(null)} />;
+  const load = useCallback(() => api.get<FileEntry[]>(`/files?system=${showSystem}`).then(setEntries).catch(() => toast.error('خواندن فایل‌ها ممکن نشد.')), [showSystem]);
+  useEffect(() => {
+    load();
+  }, [load, openFile]);
 
-  const entries: Entry[] = [
-    ...files.map((file): Entry => {
-      const meta = metaOf(file);
-      return {
-        id: file.id,
-        name: file.name,
-        dir: folderPath[file.folder],
-        folder: file.folder,
-        typeLabel: meta.label,
-        icon: meta.icon,
-        color: meta.color,
-        size: file.size,
-        modified: file.modified,
-        by: file.by,
-        system: false,
-        open: () => setOpenFile(file.id),
-      };
-    }),
-    ...(showSystem
-      ? systemFiles.map((file): Entry => {
-          const group = systemFolders.find((f) => f.id === file.kind)!;
-          return {
-            id: file.id,
-            name: file.name,
-            dir: group.dir,
-            folder: file.kind,
-            typeLabel: systemMeta[file.kind].label,
-            icon: systemMeta[file.kind].icon,
-            color: 'text-primary',
-            size: file.size,
-            modified: file.modified,
-            by: file.by,
-            system: true,
-            // System files open in the screen that edits them, not in a document editor.
-            open: () => router.push(group.href),
-          };
-        })
-      : []),
-  ];
+  const folders = useMemo(() => [...new Set(entries.map((e) => e.folder))].filter((f) => f !== '/').sort(), [entries]);
+  const visible = entries.filter((e) => (folder === null || e.folder === folder || e.folder.startsWith(`${folder}/`)) && e.path.includes(query.trim()));
 
-  const visible = entries.filter((e) => (folder === 'all' || e.folder === folder) && (e.name + e.dir).includes(query.trim()));
-  const currentDir = folder === 'all' ? '' : (folderPath[folder] ?? systemFolders.find((f) => f.id === folder)?.dir ?? '');
+  if (openFile) return <FileView path={openFile} onBack={() => setOpenFile(null)} />;
 
   return (
     <>
@@ -254,65 +144,39 @@ export default function FilesPage() {
         title="فایل‌ها"
         meta={
           <>
-            <HardDrivesIcon className="size-4" />
-            <span className="ltr-nums font-mono">{workspace.path}</span>
-            <span>· {fa(files.length + systemFiles.length)} فایل</span>
+            <span>{fa(entries.length)} فایل</span>
           </>
         }
         actions={
-          <>
-            <Button variant="outline" size="sm" onClick={() => toast('پوشهٔ فضای کاری در Explorer باز می‌شود')}>
-              <FolderOpenIcon /> نمایش در Explorer
-            </Button>
-            <Button size="sm">
-              <UploadSimpleIcon /> افزودن فایل
-            </Button>
-          </>
+          <Button variant="outline" size="sm" onClick={() => (window.desktop?.openPath ? window.desktop.openPath(workspace?.path ?? '') : toast('فقط در برنامهٔ دسکتاپ ممکن است.'))}>
+            <ArrowSquareOutIcon /> نمایش در Explorer
+          </Button>
         }
       />
       <div className="flex min-h-0 flex-1">
-        {/* Folder tree of the workspace */}
         <aside className={subNav}>
-          <button onClick={() => setFolder('all')} data-active={folder === 'all'} className={cn(navRow, 'text-foreground')}>
-            <HardDrivesIcon weight={folder === 'all' ? 'fill' : 'bold'} className={cn(folder === 'all' && 'text-primary')} />
-            <span className="truncate">{workspace.name}</span>
-            <span className="text-muted-foreground ms-auto text-xs">{fa(entries.length)}</span>
+          <button onClick={() => setFolder(null)} data-active={folder === null} className={cn(navRow, 'text-foreground')}>
+            <HardDrivesIcon weight={folder === null ? 'fill' : 'bold'} className={cn(folder === null && 'text-primary')} />
+            <span className="truncate">{workspace?.name}</span>
           </button>
           <div className="border-border/80 ms-[17px] space-y-0.5 border-s ps-1.5">
-            {folders.map((f) => (
-              <button key={f.id} onClick={() => setFolder(f.id)} data-active={folder === f.id} className={navRow}>
-                <FolderSimpleIcon weight={folder === f.id ? 'fill' : 'bold'} className={cn(folder === f.id && 'text-primary')} />
-                <span className="truncate">{f.name}</span>
-                <span className="ms-auto text-xs">{fa(f.count)}</span>
-              </button>
-            ))}
-            {showSystem && (
-              <>
-                <div className="text-primary/80 flex items-center gap-1.5 px-2.5 pt-3 pb-1 text-xs font-medium">
-                  <GearFineIcon className="size-3.5" />
-                  <span className="ltr-nums font-mono">.harness</span>
-                </div>
-                {systemFolders.map((f) => {
-                  const SysIcon = systemMeta[f.id].icon;
-                  return (
-                    <button key={f.id} onClick={() => setFolder(f.id)} data-active={folder === f.id} className={navRow}>
-                      <SysIcon weight={folder === f.id ? 'fill' : 'bold'} className="text-primary" />
-                      <span className="truncate">{f.name}</span>
-                      <span className="ms-auto text-xs">{fa(systemFiles.filter((s) => s.kind === f.id).length)}</span>
-                    </button>
-                  );
-                })}
-              </>
-            )}
+            {folders.map((path) => {
+              const system = path.startsWith('/.harness');
+              return (
+                <button key={path} onClick={() => setFolder(path)} data-active={folder === path} className={navRow}>
+                  {system ? <GearFineIcon className="text-primary" /> : <FolderSimpleIcon weight={folder === path ? 'fill' : 'bold'} className={cn(folder === path && 'text-primary')} />}
+                  <bdi className="truncate">{path.slice(1)}</bdi>
+                </button>
+              );
+            })}
           </div>
         </aside>
 
-        {/* Files */}
         <div className="scrollbar-minimal min-w-0 flex-1 overflow-y-auto px-4">
           <div className="flex flex-wrap items-center gap-3 py-4">
-            <div className="text-muted-foreground ltr-nums min-w-0 flex-1 truncate text-end font-mono text-sm">
-              {workspace.path}
-              {currentDir && `\\${currentDir.replaceAll('/', '\\')}`}
+            <div className="text-muted-foreground min-w-0 flex-1 truncate text-end text-sm" dir="ltr">
+              {workspace?.path}
+              {folder?.replaceAll('/', '\\')}
             </div>
             <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-sm">
               <GearFineIcon className={cn('size-4', showSystem && 'text-primary')} />
@@ -321,7 +185,7 @@ export default function FilesPage() {
                 checked={showSystem}
                 onCheckedChange={(value) => {
                   setShowSystem(value);
-                  if (!value && systemFolders.some((f) => f.id === folder)) setFolder('all');
+                  if (!value && folder?.startsWith('/.harness')) setFolder(null);
                 }}
               />
             </label>
@@ -329,19 +193,13 @@ export default function FilesPage() {
               <MagnifyingGlassIcon className="text-muted-foreground absolute start-3 top-1/2 size-4 -translate-y-1/2" />
               <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="جست‌وجو در فایل‌ها…" className="h-8 ps-9" />
             </div>
-            <Segmented
-              value={view}
-              onChange={setView}
-              options={[
-                { value: 'list', label: '', icon: <ListIcon /> },
-                { value: 'grid', label: '', icon: <SquaresFourIcon /> },
-              ]}
-            />
           </div>
 
           {visible.length === 0 ? (
-            <EmptyNote icon={<FolderSimpleIcon />} title="فایلی پیدا نشد" />
-          ) : view === 'list' ? (
+            <EmptyNote icon={<FolderSimpleIcon />} title={entries.length ? 'فایلی با این مشخصات نیست' : 'این فضای کاری هنوز فایلی ندارد'}>
+              {entries.length ? null : 'فایل‌های خود را در پوشهٔ فضای کاری بگذارید، یا از ایجنت بخواهید چیزی بسازد.'}
+            </EmptyNote>
+          ) : (
             <Table className="mb-6">
               <THead>
                 <Th>نام</Th>
@@ -349,56 +207,29 @@ export default function FilesPage() {
                 <Th>پوشه</Th>
                 <Th>اندازه</Th>
                 <Th>آخرین تغییر</Th>
-                <Th>توسط</Th>
               </THead>
               <TBody>
-                {visible.map((entry) => (
-                  <Tr key={entry.id} onClick={entry.open}>
-                    <Td className="min-w-56">
-                      <span className="flex items-center gap-2.5 font-medium">
-                        {entry.system ? (
-                          <span className="bg-primary-soft text-primary flex size-7 shrink-0 items-center justify-center rounded-lg">
-                            <entry.icon weight="fill" className="size-4" />
-                          </span>
-                        ) : (
-                          <span className="flex size-7 shrink-0 items-center justify-center">
-                            <entry.icon weight="fill" className={cn('size-6', entry.color)} />
-                          </span>
-                        )}
-                        {entry.name}
-                      </span>
-                    </Td>
-                    <Td className="whitespace-nowrap">{entry.system ? <Badge tone="primary">{entry.typeLabel}</Badge> : <span className="text-muted-foreground">{entry.typeLabel}</span>}</Td>
-                    <Td className="text-muted-foreground whitespace-nowrap">
-                      <span className="ltr-nums font-mono text-[0.8125rem]">{entry.dir}</span>
-                    </Td>
-                    <Td className="text-muted-foreground whitespace-nowrap">{entry.size}</Td>
-                    <Td className="text-muted-foreground whitespace-nowrap">{entry.modified}</Td>
-                    <Td className="text-muted-foreground whitespace-nowrap">{entry.by}</Td>
-                  </Tr>
-                ))}
+                {visible.map((entry) => {
+                  const meta = kindOf(entry.name);
+                  return (
+                    <Tr key={entry.path} onClick={() => setOpenFile(entry.path)}>
+                      <Td className="min-w-56">
+                        <span className="flex items-center gap-2.5 font-medium">
+                          <meta.icon weight="fill" className={cn('size-6 shrink-0', entry.system ? 'text-primary' : meta.color)} />
+                          <span dir="auto">{entry.name}</span>
+                        </span>
+                      </Td>
+                      <Td className="whitespace-nowrap">{entry.system ? <Badge tone="primary">سیستمی</Badge> : <span className="text-muted-foreground">{meta.label}</span>}</Td>
+                      <Td className="text-muted-foreground whitespace-nowrap">
+                        <bdi>{entry.folder === '/' ? '—' : entry.folder.replace(/^\//, '')}</bdi>
+                      </Td>
+                      <Td className="text-muted-foreground whitespace-nowrap">{size(entry.size)}</Td>
+                      <Td className="text-muted-foreground whitespace-nowrap">{when(entry.modified)}</Td>
+                    </Tr>
+                  );
+                })}
               </TBody>
             </Table>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 pb-6 md:grid-cols-3 xl:grid-cols-4">
-              {visible.map((entry) => (
-                <button
-                  key={entry.id}
-                  onClick={entry.open}
-                  className={cn('bg-popover overflow-hidden rounded-xl border text-start transition-colors', entry.system ? 'border-primary/30 hover:border-primary/60' : 'hover:border-primary/40')}
-                >
-                  <div className={cn('flex aspect-[16/10] items-center justify-center border-b', entry.system ? 'bg-primary-soft/60' : 'bg-surface')}>
-                    <entry.icon weight="duotone" className={cn('size-10', entry.color)} />
-                  </div>
-                  <div className="px-3 py-2.5">
-                    <div className="truncate text-sm font-medium">{entry.name}</div>
-                    <div className="text-muted-foreground mt-0.5 truncate text-xs">
-                      {entry.typeLabel} · {entry.modified}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
           )}
         </div>
       </div>

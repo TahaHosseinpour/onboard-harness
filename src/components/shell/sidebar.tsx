@@ -1,17 +1,6 @@
 'use client';
 
-import {
-  BellIcon,
-  CaretDownIcon,
-  CaretUpDownIcon,
-  CheckIcon,
-  FolderOpenIcon,
-  GearSixIcon,
-  PlusIcon,
-  SidebarSimpleIcon,
-  SignOutIcon,
-  UserCircleIcon,
-} from '@phosphor-icons/react';
+import { BellIcon, CaretDownIcon, CaretUpDownIcon, CheckIcon, FolderOpenIcon, GearSixIcon, PlusIcon, SidebarSimpleIcon } from '@phosphor-icons/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -19,72 +8,43 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogClose, DialogContent, Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger, Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlays';
-import { Dot, Glyph, Hint, Input, Kbd, Label } from '@/components/ui/primitives';
-import { agentById, APP_NAME, me, notifications, org, tasks, taskStatus, workspace } from '@/lib/mock';
-import { useUi } from '@/lib/store';
+import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger, Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlays';
 import { navRow } from '@/components/ui/patterns';
+import { Dot, Hint, Kbd } from '@/components/ui/primitives';
+import { ApiError } from '@/lib/api';
+import { toolLabel, useBackend, waitingRuns } from '@/lib/backend';
+import { useUi } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { navItems } from './nav';
 
-const rowClass = navRow;
 const railRow = 'justify-center px-0';
 
+const runTone: Record<string, string> = { running: 'primary', waiting: 'warning', finished: 'neutral' };
+
 export function LogoMark({ className }: { className?: string }) {
-  return (
-    <Image src="/logo.png" alt="" width={28} height={28} priority className={cn('size-7 shrink-0 object-contain', className)} />
-  );
+  return <Image src="/logo.png" alt="" width={28} height={28} priority className={cn('size-7 shrink-0 object-contain', className)} />;
 }
 
-/** A workspace is its folder, the way a repository is: it is chosen once, at creation.
- *  Pointing an existing workspace at another folder would orphan everything in it. */
-function NewWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const [folder, setFolder] = useState('');
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        title="فضای کاری جدید"
-        description="هر فضای کاری یک پوشه روی این سیستم است و همه‌چیز همان‌جا ذخیره می‌شود."
-        footer={
-          <>
-            <DialogClose asChild>
-              <Button variant="ghost" size="sm">انصراف</Button>
-            </DialogClose>
-            <DialogClose asChild>
-              <Button size="sm" disabled={!folder} onClick={() => toast.success('فضای کاری ساخته شد', { description: folder })}>
-                ساخت فضای کاری
-              </Button>
-            </DialogClose>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <Label>نام</Label>
-            <Input placeholder="مثلاً: شعبهٔ اصفهان" />
-          </div>
-          <div>
-            <Label>پوشه</Label>
-            <div className="flex gap-2">
-              <Input readOnly dir="ltr" value={folder} placeholder="D:\..." className="font-mono" />
-              <Button variant="outline" onClick={() => setFolder('D:\\Nikan-Isfahan')}>
-                <FolderOpenIcon /> انتخاب
-              </Button>
-            </div>
-          </div>
-          <p className="bg-warning-soft text-warning rounded-xl px-3.5 py-2.5 text-xs leading-6">
-            پوشهٔ فضای کاری بعداً قابل تغییر نیست. برای کار در پوشه‌ای دیگر، یک فضای کاری جدید بسازید.
-          </p>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
+/** The open workspace and the other folders this machine has used. A workspace is
+ *  its folder, like a repository: switching means opening another folder. */
 function WorkspaceSwitcher({ open }: { open: boolean }) {
-  const [creating, setCreating] = useState(false);
+  const workspace = useBackend((s) => s.workspace);
+  const openWorkspace = useBackend((s) => s.openWorkspace);
+
+  const switchTo = async (path: string) => {
+    try {
+      await openWorkspace(path);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'باز کردن فضای کاری ممکن نشد.');
+    }
+  };
+  const pickNew = async () => {
+    const folder = await window.desktop?.pickFolder?.();
+    if (folder) await switchTo(folder);
+    else if (!window.desktop?.pickFolder) toast('انتخاب پوشه فقط در برنامهٔ دسکتاپ ممکن است.');
+  };
+
   return (
-    <>
     <Menu>
       <MenuTrigger
         className={cn('hover:bg-hover data-[state=open]:bg-hover flex h-10 min-w-0 items-center gap-2 rounded-lg text-start outline-none', open ? 'flex-1 px-1.5' : 'w-10 justify-center')}
@@ -93,149 +53,94 @@ function WorkspaceSwitcher({ open }: { open: boolean }) {
         <LogoMark />
         {open && (
           <>
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold">{org.name}</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold">{workspace?.name}</span>
             <CaretUpDownIcon className="text-muted-foreground size-4" />
           </>
         )}
       </MenuTrigger>
-      <MenuContent align="start" className="w-64">
-        <MenuLabel>فضاهای کاری</MenuLabel>
-        <MenuItem className="h-auto py-1.5">
-          <Glyph size="sm" tone="primary">ن</Glyph>
-          <span className="min-w-0 flex-1 leading-tight">
-            <span className="block">{org.name}</span>
-            <span className="text-muted-foreground ltr-nums block truncate text-end font-mono text-[11px]">{workspace.path}</span>
-          </span>
-          <CheckIcon className="text-primary!" />
-        </MenuItem>
-        <MenuItem className="h-auto py-1.5">
-          <Glyph size="sm">ش</Glyph>
-          <span className="min-w-0 flex-1 leading-tight">
-            <span className="block">فضای شخصی</span>
-            <span className="text-muted-foreground ltr-nums block truncate text-end font-mono text-[11px]">{'C:\\Users\\Nima\\Harness'}</span>
-          </span>
-        </MenuItem>
-        <MenuSeparator />
-        <MenuLabel>واحد فعال</MenuLabel>
-        {['مدیریت', 'فروش', 'مارکتینگ', 'مالی'].map((unit) => (
-          <MenuItem key={unit}>
-            <span className="flex-1">{unit}</span>
-            {unit === org.unit && <CheckIcon className="text-primary!" />}
+      <MenuContent align="start" className="w-72">
+        <MenuLabel>فضاهای کاری این سیستم</MenuLabel>
+        {(workspace?.known ?? []).map((path) => (
+          <MenuItem key={path} className="h-auto py-1.5" onSelect={() => path !== workspace?.path && switchTo(path)}>
+            <span className="ltr-nums min-w-0 flex-1 truncate text-end font-mono text-xs">{path}</span>
+            {path === workspace?.path && <CheckIcon className="text-primary!" />}
           </MenuItem>
         ))}
         <MenuSeparator />
-        <MenuItem onSelect={() => setCreating(true)}>
-          <PlusIcon />
-          فضای کاری جدید
+        <MenuItem onSelect={pickNew}>
+          <FolderOpenIcon />
+          باز کردن پوشه‌ای دیگر
         </MenuItem>
       </MenuContent>
     </Menu>
-    <NewWorkspaceDialog open={creating} onOpenChange={setCreating} />
-    </>
   );
 }
 
+/** The bell lists what is waiting for the user right now: paused actions, across all tasks. */
 function Notifications() {
-  const unread = notifications.filter((n) => n.unread).length;
+  const router = useRouter();
+  const waiting = waitingRuns(useBackend((s) => s.runs));
   return (
     <Popover>
-      <Hint label="اعلان‌ها" side="bottom">
+      <Hint label="منتظر شما" side="bottom">
         <PopoverTrigger asChild>
           <Button variant="muted" size="icon-sm" aria-label="اعلان‌ها" className="relative">
             <BellIcon />
-            {unread > 0 && <span className="bg-primary ring-sidebar absolute end-1.5 top-1.5 size-2 rounded-full ring-2" />}
+            {waiting.length > 0 && <span className="bg-primary ring-sidebar absolute end-1.5 top-1.5 size-2 rounded-full ring-2" />}
           </Button>
         </PopoverTrigger>
       </Hint>
       <PopoverContent align="end" side="bottom" className="w-92 p-0">
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <span className="text-sm font-semibold">اعلان‌ها</span>
-          <button className="text-primary text-xs">همه را خوانده‌شده کن</button>
-        </div>
-        <ul className="divide-border/70 divide-y">
-          {notifications.map((n) => (
-            <li key={n.id} className={cn('hover:bg-hover flex gap-3 px-4 py-3', n.unread && 'bg-primary-soft/40')}>
-              <Dot tone={n.tone} className="mt-2.5 size-2" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">{n.title}</span>
-                  <span className="text-muted-foreground text-xs">{n.when}</span>
-                </div>
-                <p className="text-muted-foreground mt-0.5 text-xs leading-5">{n.text}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="border-b px-4 py-3 text-sm font-semibold">منتظر تأیید شما</div>
+        {waiting.length === 0 ? (
+          <p className="text-muted-foreground px-4 py-6 text-center text-sm">چیزی منتظر شما نیست.</p>
+        ) : (
+          <ul className="divide-border/70 divide-y">
+            {waiting.map((run) => (
+              <li key={run.thread_id}>
+                <button className="hover:bg-hover flex w-full gap-3 px-4 py-3 text-start" onClick={() => router.push('/approvals')}>
+                  <Dot tone="warning" className="mt-2.5 size-2" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{run.title || 'کار بدون عنوان'}</span>
+                    <span className="text-muted-foreground block truncate text-xs">{(run.pending ?? []).map((a) => toolLabel[a.tool] ?? a.tool).join('، ')}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </PopoverContent>
     </Popover>
   );
 }
 
-function UserMenu({ open }: { open: boolean }) {
-  const router = useRouter();
-  return (
-    <Menu>
-      <MenuTrigger
-        className={cn('hover:bg-hover data-[state=open]:bg-hover flex h-10 min-w-0 items-center gap-2 rounded-lg text-start outline-none', open ? 'flex-1 px-1.5' : 'w-10 justify-center')}
-        aria-label="حساب کاربری"
-      >
-        <span className="bg-primary-soft text-primary flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold">{me.initials}</span>
-        {open && (
-          <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium">{me.name}</span>
-        )}
-      </MenuTrigger>
-      <MenuContent align="start" side="top" className="w-56">
-        <MenuItem>
-          <UserCircleIcon />
-          حساب کاربری
-        </MenuItem>
-        <MenuItem onSelect={() => router.push('/settings')}>
-          <GearSixIcon />
-          تنظیمات
-        </MenuItem>
-        <MenuSeparator />
-        <MenuItem>
-          <SignOutIcon />
-          خروج
-        </MenuItem>
-      </MenuContent>
-    </Menu>
-  );
-}
-
-/** Expanded: full navigation and recent tasks. Collapsed: an icon rail, so the way back is always visible. */
+/** Expanded: navigation and recent tasks. Collapsed: an icon rail, so the way back is always visible. */
 export function AppSidebar({ open }: { open: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const toggleSidebar = useUi((s) => s.toggleSidebar);
-  const setActiveTask = useUi((s) => s.setActiveTask);
-  const activeTaskId = useUi((s) => s.activeTaskId);
+  const setActiveThread = useUi((s) => s.setActiveThread);
+  const activeThread = useUi((s) => s.activeThread);
+  const runs = useBackend((s) => s.runs);
   const [recentOpen, setRecentOpen] = useState(true);
-
-  const toggle = (
-    <Hint
-      side="left"
-      label={
-        <>
-          بازکردن منو <Kbd className="bg-background/20 text-background ltr-nums">Ctrl B</Kbd>
-        </>
-      }
-    >
-      <Button variant="muted" size="icon-sm" aria-label="منو" onClick={toggleSidebar}>
-        <SidebarSimpleIcon className="-scale-x-100" />
-      </Button>
-    </Hint>
-  );
+  const waitingCount = waitingRuns(runs).length;
+  const settingsActive = pathname.startsWith('/settings');
 
   return (
     <aside className={cn('flex shrink-0 flex-col px-2 pb-2 transition-[width] duration-200 ease-[cubic-bezier(0.2,0,0,1)]', open ? 'w-[248px]' : 'w-14')}>
       <div className={cn('flex items-center gap-1', !open && 'flex-col')}>
         <WorkspaceSwitcher open={open} />
         <Notifications />
-        {!open && toggle}
+        {!open && (
+          <Hint side="left" label={<>بازکردن منو <Kbd className="bg-background/20 text-background ltr-nums">Ctrl B</Kbd></>}>
+            <Button variant="muted" size="icon-sm" aria-label="منو" onClick={toggleSidebar}>
+              <SidebarSimpleIcon className="-scale-x-100" />
+            </Button>
+          </Hint>
+        )}
       </div>
 
-      <Link href="/tasks" className={cn(rowClass, 'text-sidebar-foreground mt-2 shrink-0', !open && railRow)} onClick={() => setActiveTask('new')} aria-label="کار جدید">
+      <Link href="/tasks" className={cn(navRow, 'text-sidebar-foreground mt-2 shrink-0', !open && railRow)} onClick={() => setActiveThread(null)} aria-label="کار جدید">
         <PlusIcon />
         {open && (
           <>
@@ -249,14 +154,15 @@ export function AppSidebar({ open }: { open: boolean }) {
         <ul className="flex flex-col gap-0.5">
           {navItems.map((item) => {
             const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+            const badge = item.href === '/approvals' ? waitingCount : 0;
             const link = (
-              <Link href={item.href} className={cn(rowClass, !open && railRow)} data-active={active} aria-label={item.label}>
+              <Link href={item.href} className={cn(navRow, !open && railRow)} data-active={active} aria-label={item.label}>
                 <item.icon weight={active ? 'fill' : 'bold'} className={cn(active && 'text-primary')} />
                 {open && <span className="flex-1 truncate">{item.label}</span>}
-                {item.badge &&
+                {badge > 0 &&
                   (open ? (
                     <span className="bg-primary text-primary-foreground flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-medium">
-                      {item.badge.toLocaleString('fa-IR')}
+                      {badge.toLocaleString('fa-IR')}
                     </span>
                   ) : (
                     <span className="bg-primary ring-sidebar absolute end-2 top-1.5 size-2 rounded-full ring-2" />
@@ -267,7 +173,7 @@ export function AppSidebar({ open }: { open: boolean }) {
           })}
         </ul>
 
-        {open && (
+        {open && runs.length > 0 && (
           <div className="mt-5">
             <button
               onClick={() => setRecentOpen((v) => !v)}
@@ -278,45 +184,30 @@ export function AppSidebar({ open }: { open: boolean }) {
               <CaretDownIcon className={cn('size-3 transition-transform', !recentOpen && 'rotate-90')} />
             </button>
             <ul className={cn('flex flex-col gap-0.5', !recentOpen && 'hidden')}>
-              {tasks.map((task) => {
-                const agent = agentById(task.agent);
-                return (
-                  <li key={task.id}>
-                    <button
-                      className={cn(rowClass, 'font-normal')}
-                      data-active={pathname.startsWith('/tasks') && activeTaskId === task.id}
-                      onClick={() => {
-                        setActiveTask(task.id);
-                        router.push('/tasks');
-                      }}
-                    >
-                      <span className="relative">
-                        <Glyph size="sm" tone={agent.tone}>{agent.initial}</Glyph>
-                        {task.status !== 'done' && (
-                          <Dot tone={taskStatus[task.status].tone} pulse={task.status === 'running'} className="ring-sidebar absolute -end-0.5 -bottom-0.5 size-2 ring-2" />
-                        )}
-                      </span>
-                      <span className="flex-1 truncate text-start">{task.title}</span>
-                    </button>
-                  </li>
-                );
-              })}
+              {runs.slice(0, 12).map((run) => (
+                <li key={run.thread_id}>
+                  <button
+                    className={cn(navRow, 'font-normal')}
+                    data-active={pathname.startsWith('/tasks') && activeThread === run.thread_id}
+                    onClick={() => {
+                      setActiveThread(run.thread_id);
+                      router.push('/tasks');
+                    }}
+                  >
+                    <Dot tone={runTone[run.status]} pulse={run.status === 'running'} className="mx-1.5 size-2" />
+                    <span className="flex-1 truncate text-start">{run.title || 'کار بدون عنوان'}</span>
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
         )}
       </nav>
 
-      <div className={cn('mt-2 flex items-center gap-0.5', !open && 'flex-col-reverse')}>
-        <UserMenu open={open} />
-        <Hint label="تنظیمات" side="top">
-          <Button asChild variant="muted" size="icon-sm" className={cn(pathname.startsWith('/settings') && 'bg-active text-primary')}>
-            <Link href="/settings" aria-label="تنظیمات">
-              <GearSixIcon weight={pathname.startsWith('/settings') ? 'fill' : 'bold'} />
-            </Link>
-          </Button>
-        </Hint>
-      </div>
-      <span className="sr-only">{APP_NAME}</span>
+      <Link href="/settings" className={cn(navRow, 'mt-2 shrink-0', !open && railRow)} data-active={settingsActive} aria-label="تنظیمات">
+        <GearSixIcon weight={settingsActive ? 'fill' : 'bold'} className={cn(settingsActive && 'text-primary')} />
+        {open && <span className="flex-1">تنظیمات</span>}
+      </Link>
     </aside>
   );
 }

@@ -9,6 +9,7 @@
     "output": "release/dist"
   },
   "files": ["electron/**", "out/**", "package.json", "!**/node_modules/**", "!**/*.map"],
+  "extraResources": [{ "from": "backend/dist/harness-server", "to": "backend" }],
   "asar": true,
   "npmRebuild": false,
   "win": {

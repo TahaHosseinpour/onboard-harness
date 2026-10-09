@@ -1,6 +1,8 @@
-const { app, BrowserWindow, Menu, ipcMain, nativeTheme, protocol, shell } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeTheme, protocol, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
+
+const engine = require('./backend.cjs');
 
 // Dev: the Next dev server. Packaged: the static export served over app://.
 const DEV_URL = process.env.DESKTOP_DEV_URL;
@@ -117,11 +119,25 @@ app.on('second-instance', () => {
   win.focus();
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // The app draws its own chrome; the default File/Edit/View menu has no place in it.
   if (app.isPackaged) Menu.setApplicationMenu(null);
 
   protocol.handle('app', serveExport);
+
+  // The engine starts first so the page knows its address; the page waits for it to answer.
+  await engine.start();
+  ipcMain.on('desktop:api', (event) => {
+    event.returnValue = engine.connection.url ? { ...engine.connection } : null;
+  });
+  ipcMain.handle('desktop:pick-folder', async (event) => {
+    const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
+      title: 'انتخاب پوشهٔ فضای کاری',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+  ipcMain.handle('desktop:open-path', (_event, target) => shell.openPath(String(target)));
 
   ipcMain.on('desktop:set-theme', (event, theme) => {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -136,6 +152,8 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+app.on('will-quit', () => engine.stop());
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

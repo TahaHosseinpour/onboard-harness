@@ -1,363 +1,153 @@
 'use client';
 
-import {
-  ArrowRightIcon,
-  BrainIcon,
-  ChatTeardropTextIcon,
-  CheckIcon,
-  LightbulbIcon,
-  LightningIcon,
-  PlusIcon,
-  RobotIcon,
-  ShieldCheckIcon,
-  SparkleIcon,
-  WrenchIcon,
-  XIcon,
-} from '@phosphor-icons/react';
-import { useState } from 'react';
+import { BrainIcon, FloppyDiskIcon, PencilSimpleIcon, PlusIcon, RobotIcon, ShieldCheckIcon, TrashIcon, WrenchIcon } from '@phosphor-icons/react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { Automations } from '@/components/sections/automations';
-import { Knowledge } from '@/components/sections/knowledge';
 import { PageBody, PageHeader } from '@/components/shell/page';
 import { Button } from '@/components/ui/button';
-import { Select, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/overlays';
-import { Block, BlockLabel, ListRow, MetaDot, Row, RowGroup } from '@/components/ui/patterns';
-import { Badge, Glyph, Input, Label, Segmented, Switch, Textarea } from '@/components/ui/primitives';
-import { accessMeta, agents, connections, rules as initialRules, skills, suggestions as initialSuggestions, type Access } from '@/lib/mock';
-import { cn, fa, toman } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/overlays';
+import { BlockLabel, EmptyNote, Row, RowGroup } from '@/components/ui/patterns';
+import { Badge, Glyph, Input, Textarea } from '@/components/ui/primitives';
+import { api, ApiError, type AgentProfile, type Skill } from '@/lib/api';
+import { toolLabel, useBackend } from '@/lib/backend';
+import { useUi } from '@/lib/store';
+import { cn, fa } from '@/lib/utils';
 
-/* ───────────── Teach by talking ───────────── */
+type Access = 'allow' | 'ask' | 'deny';
+type FileRule = { paths: string[]; operations: ('read' | 'write')[]; access: Access };
+type Rules = { files: FileRule[]; tools: Record<string, Access> };
 
-type Kind = 'skill' | 'rule' | 'automation';
-const kindMeta: Record<Kind, { label: string; icon: typeof WrenchIcon; tone: 'primary' | 'warning' | 'info' }> = {
-  skill: { label: 'مهارت', icon: WrenchIcon, tone: 'primary' },
-  rule: { label: 'قانون', icon: ShieldCheckIcon, tone: 'warning' },
-  automation: { label: 'اتوماسیون', icon: LightningIcon, tone: 'info' },
-};
+const accessLabel: Record<Access, string> = { allow: 'مجاز', ask: 'با تأیید', deny: 'ممنوع' };
+const accessTone: Record<Access, string> = { allow: 'bg-success-soft text-success', ask: 'bg-warning-soft text-warning', deny: 'bg-danger-soft text-danger' };
 
-const examples: { text: string; kind: Kind }[] = [
-  { text: 'هیچ‌وقت بدون تأیید من به مشتری ایمیل نفرست', kind: 'rule' },
-  { text: 'گزارش‌ها را همیشه با یک خلاصهٔ سه‌خطی شروع کن', kind: 'skill' },
-  { text: 'وقتی موجودی کالایی کم شد خبرم کن', kind: 'automation' },
-];
-
-function Teach() {
-  const [text, setText] = useState('');
-  const [draft, setDraft] = useState<{ text: string; kind: Kind } | null>(null);
-  const [layer, setLayer] = useState('unit');
-
-  const guess = (value: string): Kind => (/^(وقتی|هر وقت|هر بار|هنگامی که)/.test(value.trim()) ? 'automation' : /هیچ‌وقت|نکن|نفرست|ممنوع|بدون تأیید/.test(value) ? 'rule' : 'skill');
-  const submit = (value = text) => value.trim() && setDraft({ text: value.trim(), kind: guess(value) });
-  const meta = draft && kindMeta[draft.kind];
-
+function AccessPicker({ value, onChange }: { value: Access; onChange: (value: Access) => void }) {
   return (
-    <div className="mx-auto max-w-3xl">
-      <h2 className="text-center text-xl font-semibold">با حرف‌زدن یادش بدهید</h2>
-      <p className="text-muted-foreground mt-2 text-center text-sm">یک جمله بنویسید؛ خودش تشخیص می‌دهد مهارت است، قانون یا اتوماسیون، و قبل از ذخیره نشانتان می‌دهد.</p>
-
-      <div className="bg-background focus-within:border-primary/50 focus-within:ring-primary/10 shadow-float mt-6 rounded-3xl border focus-within:ring-4">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          rows={3}
-          placeholder="مثلاً: وقتی مشتری از تأخیر ارسال شکایت کرد، اول عذرخواهی کن و کد رهگیری بده"
-          className="placeholder:text-muted-foreground block w-full resize-none bg-transparent px-5 pt-4 text-[0.9375rem] leading-7 outline-none"
-        />
-        <div className="flex justify-end p-2.5">
-          <Button disabled={!text.trim()} onClick={() => submit()}>
-            <SparkleIcon weight="fill" /> پیش‌نمایش
-          </Button>
-        </div>
-      </div>
-
-      <div className="mt-3 flex flex-wrap justify-center gap-2">
-        {examples.map((example) => (
-          <button
-            key={example.text}
-            onClick={() => {
-              setText(example.text);
-              setDraft(example);
-            }}
-            className="text-muted-foreground hover:bg-hover hover:text-foreground h-9 rounded-full border px-3.5 text-xs"
-          >
-            {example.text}
-          </button>
-        ))}
-      </div>
-
-      {draft && meta && (
-        <div className="mt-8">
-          <BlockLabel>پیش‌نمایش · هنوز چیزی ذخیره نشده</BlockLabel>
-          <Block className="p-5">
-            <div className="flex items-center gap-3">
-              <Glyph size="lg" tone={meta.tone}>
-                <meta.icon weight="fill" />
-              </Glyph>
-              <div className="min-w-0 flex-1">
-                <div className="text-muted-foreground text-xs">این جمله تبدیل می‌شود به یک</div>
-                <div className="text-base font-semibold">{meta.label} جدید</div>
-              </div>
-              <Segmented
-                size="sm"
-                value={draft.kind}
-                onChange={(kind) => setDraft({ ...draft, kind })}
-                options={(Object.keys(kindMeta) as Kind[]).map((k) => ({ value: k, label: kindMeta[k].label }))}
-              />
-            </div>
-            <div className="bg-surface mt-4 rounded-xl px-4 py-3 text-sm leading-7">
-              {draft.kind === 'rule' && (
-                <>
-                  <strong className="font-semibold">قانون:</strong> {draft.text}
-                  <div className="mt-2">
-                    <Badge tone="warning">سطح مجوز: با تأیید</Badge>
-                  </div>
-                </>
-              )}
-              {draft.kind === 'skill' && (
-                <>
-                  <strong className="font-semibold">هر وقت این کار پیش آمد:</strong> {draft.text}
-                  <ol className="text-muted-foreground mt-2 list-decimal space-y-1 ps-5">
-                    <li>موقعیت را تشخیص بده</li>
-                    <li>طبق همین دستور عمل کن</li>
-                    <li>نتیجه را مطابق لحن برند بنویس</li>
-                  </ol>
-                </>
-              )}
-              {draft.kind === 'automation' && (
-                <>
-                  <strong className="font-semibold">اتوماسیون:</strong> {draft.text}
-                  <div className="mt-2 flex gap-2">
-                    <Badge tone="info">با رخ‌دادن همین رویداد</Badge>
-                    <Badge tone="primary">تحلیلگر فروش</Badge>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground text-xs">برای چه کسی؟</span>
-                <Segmented
-                  size="sm"
-                  value={layer}
-                  onChange={setLayer}
-                  options={[
-                    { value: 'org', label: 'کل سازمان' },
-                    { value: 'unit', label: 'واحد من' },
-                    { value: 'person', label: 'فقط من' },
-                  ]}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setDraft(null)}>
-                  نه، ولش کن
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    toast.success(`${meta.label} ذخیره شد`, { description: draft.text });
-                    setDraft(null);
-                    setText('');
-                  }}
-                >
-                  <CheckIcon /> تأیید و ذخیره
-                </Button>
-              </div>
-            </div>
-          </Block>
-        </div>
-      )}
+    <div className="bg-secondary inline-flex gap-0.5 rounded-full p-0.5">
+      {(Object.keys(accessLabel) as Access[]).map((access) => (
+        <button key={access} onClick={() => onChange(access)} className={cn('h-7 rounded-full px-3 text-xs font-medium transition-colors', value === access ? accessTone[access] : 'text-muted-foreground hover:text-foreground')}>
+          {accessLabel[access]}
+        </button>
+      ))}
     </div>
   );
 }
 
-/* ───────────── Agent editor ───────────── */
-
-function AgentEditor() {
-  const [selected, setSelected] = useState(agents[0].id);
-  const agent = agents.find((a) => a.id === selected)!;
-  const [enabledSkills, setEnabledSkills] = useState<Record<string, boolean>>({});
-  const isOn = (name: string) => enabledSkills[`${agent.id}:${name}`] ?? agent.skills.includes(name);
-  const allSkills = [...new Set([...agent.skills, ...skills.map((s) => s.name)])];
-
-  return (
-    <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
-      <div>
-        <BlockLabel
-          action={
-            <Button variant="outline" size="xs">
-              <PlusIcon /> ایجنت جدید
-            </Button>
-          }
-        >
-          ایجنت‌ها
-        </BlockLabel>
-        <div className="space-y-px">
-          {agents.map((a) => (
-            <ListRow
-              key={a.id}
-              active={a.id === selected}
-              onClick={() => setSelected(a.id)}
-              icon={<Glyph tone={a.tone}>{a.initial}</Glyph>}
-              title={a.name}
-              meta={<span className="truncate">واحد {a.unit}</span>}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div key={agent.id} className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Glyph tone={agent.tone} className="size-16 text-2xl">{agent.initial}</Glyph>
-          <div className="grid flex-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label>نام</Label>
-              <Input defaultValue={agent.name} />
-            </div>
-            <div>
-              <Label>نقش</Label>
-              <Input defaultValue={agent.role} />
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <BlockLabel>شخصیت و دستور کار</BlockLabel>
-          <Textarea
-            className="bg-popover min-h-28"
-            defaultValue={`تو ${agent.name} واحد ${agent.unit} هستی. ${agent.role} کار اصلی توست. همیشه با عدد و منبع حرف بزن و هر اقدامی که اثر بیرونی دارد را برای تأیید بفرست.`}
-          />
-        </div>
-
-        <div>
-          <BlockLabel>مهارت‌ها</BlockLabel>
-          <div className="flex flex-wrap gap-2">
-            {allSkills.map((name) => (
-              <button
-                key={name}
-                onClick={() => setEnabledSkills((prev) => ({ ...prev, [`${agent.id}:${name}`]: !isOn(name) }))}
-                className={cn(
-                  'flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm transition-colors',
-                  isOn(name) ? 'border-primary bg-primary-soft text-primary' : 'text-muted-foreground hover:bg-hover',
-                )}
-              >
-                {isOn(name) ? <CheckIcon className="size-4" /> : <PlusIcon className="size-4" />}
-                {name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <BlockLabel>تنظیمات</BlockLabel>
-          <RowGroup>
-            <Row label="سقف هزینهٔ ماهانه" description={`مصرف تا امروز: ${toman(agent.spent)}`}>
-              <Input defaultValue={toman(agent.budget, false)} className="w-44" />
-            </Row>
-            <Row label="مدیر انسانی" description="تأییدها برای این شخص فرستاده می‌شود">
-              <span className="text-sm font-medium">{agent.manager}</span>
-            </Row>
-            <Row label="اتصال‌ها" description="سرویس‌هایی که این ایجنت می‌بیند">
-              <div className="flex -space-x-1.5 space-x-reverse">
-                {connections.filter((c) => c.connected).slice(0, 4).map((c) => (
-                  <Glyph key={c.id} size="sm" tone={c.tone} className="ring-popover ltr-nums text-[9px] ring-2">{c.initial}</Glyph>
-                ))}
-              </div>
-            </Row>
-            <Row label="اجازهٔ اجرای ابری" description="وقتی سیستم شما خاموش است هم کار کند">
-              <Switch defaultChecked={agent.id !== 'finance'} />
-            </Row>
-          </RowGroup>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm">بازنشانی</Button>
-          <Button size="sm" onClick={() => toast.success(`${agent.name} ذخیره شد`)}>
-            ذخیرهٔ تغییرات
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+/** Opens a harness file in the files screen, where it can be edited and saved. */
+function useEditFile() {
+  const router = useRouter();
+  const setOpenFile = useUi((s) => s.setOpenFile);
+  return (path: string) => {
+    setOpenFile(path);
+    router.push('/files');
+  };
 }
 
 /* ───────────── Skills ───────────── */
 
 function Skills() {
-  const [selected, setSelected] = useState<string | null>(null);
-  const skill = skills.find((s) => s.id === selected);
+  const [skills, setSkills] = useState<Skill[] | null>(null);
+  const [name, setName] = useState('');
+  const edit = useEditFile();
+  const load = useCallback(() => api.get<Skill[]>('/skills').then(setSkills), []);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  if (skill)
-    return (
-      <div className="mx-auto max-w-3xl">
-        <button onClick={() => setSelected(null)} className="text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1.5 text-sm">
-          <ArrowRightIcon className="size-4" /> مهارت‌ها
-        </button>
-        <div className="space-y-5">
-          <div>
-            <Label>نام مهارت</Label>
-            <Input defaultValue={skill.name} />
-          </div>
-          <div>
-            <Label>چه زمانی استفاده شود</Label>
-            <Textarea className="bg-popover" defaultValue={skill.desc} />
-          </div>
-          <div>
-            <Label>مراحل</Label>
-            <Textarea
-              className="bg-popover min-h-44"
-              defaultValue={'۱. دادهٔ مورد نیاز را از اتصال یا پوشهٔ مربوط بخوان.\n۲. با دورهٔ قبل مقایسه کن و موارد غیرعادی را جدا کن.\n۳. خروجی را با یک خلاصهٔ مدیریتی سه‌خطی شروع کن.\n۴. اگر اقدامی لازم است، آن را به صندوق تأیید بفرست.'}
-            />
-          </div>
-          <RowGroup>
-            <Row label="لایه" description="این مهارت برای چه کسانی فعال است">
-              <Badge tone="primary">{skill.layer}</Badge>
-            </Row>
-            <Row label="ایجنت‌ها" description="چه کسانی از آن استفاده می‌کنند">
-              <span className="text-sm">{skill.agents.map((id) => agents.find((a) => a.id === id)?.name).join('، ')}</span>
-            </Row>
-          </RowGroup>
-          <div className="flex justify-end">
-            <Button size="sm" onClick={() => toast.success('مهارت ذخیره شد')}>
-              ذخیره
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
+  const create = async () => {
+    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    if (!id) return toast.error('نام مهارت را با حروف لاتین بنویسید (مثلاً monthly-report).');
+    const path = `/.harness/skills/${id}/SKILL.md`;
+    await api.put('/files/content', { path, content: `---\nname: ${id}\ndescription: یک جمله که بگوید این مهارت برای چه کاری است.\n---\n\n# ${id}\n\n## کی استفاده شود\n\n## مراحل\n1. \n` });
+    setName('');
+    edit(path);
+  };
 
   return (
     <>
-      <BlockLabel
-        action={
-          <Button variant="outline" size="xs">
-            <PlusIcon /> مهارت جدید
-          </Button>
-        }
-      >
-        {fa(skills.length)} مهارت · دستور کارهایی که ایجنت‌ها بلدند
-      </BlockLabel>
+      <BlockLabel>مهارت یعنی روش انجام یک نوع کار. ایجنت فقط وقتی کار مرتبط پیش بیاید متن کاملش را می‌خواند.</BlockLabel>
+      <div className="mb-3 flex gap-2">
+        <Input dir="ltr" className="max-w-xs font-mono" placeholder="monthly-report" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && create()} />
+        <Button variant="outline" onClick={create} disabled={!name.trim()}>
+          <PlusIcon /> مهارت جدید
+        </Button>
+      </div>
+      {skills?.length === 0 ? (
+        <EmptyNote icon={<WrenchIcon />} title="هنوز مهارتی نیست" />
+      ) : (
+        <RowGroup>
+          {(skills ?? []).map((skill) => (
+            <Row
+              key={skill.id}
+              onClick={() => edit(`/.harness/skills/${skill.id}/SKILL.md`)}
+              leading={
+                <Glyph tone="primary">
+                  <WrenchIcon weight="fill" />
+                </Glyph>
+              }
+              label={<span className="ltr-nums font-mono">{skill.name}</span>}
+              description={<span dir="auto">{skill.description}</span>}
+            >
+              <Button variant="muted" size="xs">
+                <PencilSimpleIcon /> ویرایش
+              </Button>
+            </Row>
+          ))}
+        </RowGroup>
+      )}
+    </>
+  );
+}
+
+/* ───────────── Agents ───────────── */
+
+function Agents() {
+  const agents = useBackend((s) => s.agents);
+  const connect = useBackend((s) => s.connect);
+  const edit = useEditFile();
+  const [name, setName] = useState('');
+
+  const create = async () => {
+    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    if (!id) return toast.error('شناسهٔ ایجنت را با حروف لاتین بنویسید (مثلاً sales-analyst).');
+    const path = `/.harness/agents/${id}.yaml`;
+    await api.put('/files/content', { path, content: `name: ${id}\ntitle: ایجنت جدید\ndescription: یک جمله که بگوید این ایجنت برای چه کاری است.\nprompt: |\n  نقش و روش کار این ایجنت را اینجا بنویسید.\ntools: [calculate, read_table, aggregate_table]\n` });
+    setName('');
+    await connect();
+    edit(path);
+  };
+
+  return (
+    <>
+      <BlockLabel>هر ایجنت یک نقش، دستور کار و فهرست ابزار دارد. در کادر پیام انتخاب می‌کنید کدام‌یک کار را پیش ببرد.</BlockLabel>
+      <div className="mb-3 flex gap-2">
+        <Input dir="ltr" className="max-w-xs font-mono" placeholder="sales-analyst" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && create()} />
+        <Button variant="outline" onClick={create} disabled={!name.trim()}>
+          <PlusIcon /> ایجنت جدید
+        </Button>
+      </div>
       <RowGroup>
-        {skills.map((s) => (
+        {agents.map((agent: AgentProfile) => (
           <Row
-            key={s.id}
-            onClick={() => setSelected(s.id)}
+            key={agent.id}
+            onClick={() => edit(`/.harness/agents/${agent.id}.yaml`)}
             leading={
-              <Glyph tone="primary">
-                <WrenchIcon weight="fill" />
+              <Glyph tone="info">
+                <RobotIcon weight="fill" />
               </Glyph>
             }
-            label={s.name}
-            description={s.desc}
+            label={<span dir="auto">{agent.title}</span>}
+            description={<span dir="auto">{agent.description}</span>}
           >
-            <span className="text-muted-foreground hidden text-xs md:inline">{fa(s.uses)} بار استفاده</span>
-            <Badge tone={s.layer === 'سازمان' ? 'primary' : 'neutral'}>{s.layer}</Badge>
+            <div className="hidden gap-1.5 lg:flex">
+              {agent.tools.map((tool) => (
+                <Badge key={tool} tone="outline">{toolLabel[tool] ?? tool}</Badge>
+              ))}
+            </div>
+            <Button variant="muted" size="xs">
+              <PencilSimpleIcon /> ویرایش
+            </Button>
           </Row>
         ))}
       </RowGroup>
@@ -367,149 +157,147 @@ function Skills() {
 
 /* ───────────── Rules ───────────── */
 
-function Rules() {
-  const [rules, setRules] = useState(initialRules);
+function RulesEditor() {
+  const [rules, setRules] = useState<Rules | null>(null);
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    api.get<Rules>('/rules').then((data) => setRules({ files: data.files ?? [], tools: data.tools ?? {} }));
+  }, []);
+  if (!rules) return null;
+
+  const change = (next: Rules) => {
+    setRules(next);
+    setDirty(true);
+  };
+  const save = async () => {
+    try {
+      await api.put('/rules', rules);
+      setDirty(false);
+      toast.success('قوانین ذخیره شد و از کار بعدی اعمال می‌شود.');
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'ذخیره ممکن نشد.');
+    }
+  };
+  const setFile = (index: number, patch: Partial<FileRule>) => change({ ...rules, files: rules.files.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)) });
+
   return (
-    <>
-      <BlockLabel
-        action={
-          <Button variant="outline" size="xs">
-            <PlusIcon /> قانون جدید
-          </Button>
-        }
-      >
-        برای هر اقدام مشخص کنید: مجاز، با تأیید یا ممنوع
-      </BlockLabel>
-      <RowGroup>
-        {rules.map((rule) => (
-          <Row key={rule.id} label={rule.text} description={`دامنه: ${rule.scope}`}>
-            <div className="bg-secondary inline-flex gap-0.5 rounded-full p-0.5">
-              {(Object.keys(accessMeta) as Access[]).map((access) => {
-                const on = rule.access === access;
-                const tone = { allow: 'bg-success-soft text-success', ask: 'bg-warning-soft text-warning', deny: 'bg-danger-soft text-danger' }[access];
-                return (
+    <div className="space-y-6">
+      <div>
+        <BlockLabel
+          action={
+            <Button variant="outline" size="xs" onClick={() => change({ ...rules, files: [...rules.files, { paths: ['/**'], operations: ['write'], access: 'ask' }] })}>
+              <PlusIcon /> قاعدهٔ فایل
+            </Button>
+          }
+        >
+          فایل‌ها · اولین قاعده‌ای که با مسیر جور باشد اعمال می‌شود
+        </BlockLabel>
+        <RowGroup>
+          {rules.files.map((rule, index) => (
+            <div key={index} className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <Input dir="ltr" className="h-8 min-w-48 flex-1 font-mono text-xs" value={rule.paths.join(', ')} onChange={(e) => setFile(index, { paths: e.target.value.split(',').map((p) => p.trim()).filter(Boolean) })} />
+              <div className="bg-secondary inline-flex gap-0.5 rounded-full p-0.5">
+                {(['read', 'write'] as const).map((operation) => (
                   <button
-                    key={access}
-                    onClick={() => setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, access } : r)))}
-                    className={cn('h-7 rounded-full px-3 text-xs font-medium transition-colors', on ? tone : 'text-muted-foreground hover:text-foreground')}
+                    key={operation}
+                    onClick={() => setFile(index, { operations: rule.operations.includes(operation) ? rule.operations.filter((o) => o !== operation) : [...rule.operations, operation] })}
+                    className={cn('h-7 rounded-full px-3 text-xs font-medium', rule.operations.includes(operation) ? 'bg-background text-foreground dark:bg-accent' : 'text-muted-foreground')}
                   >
-                    {accessMeta[access].label}
+                    {operation === 'read' ? 'خواندن' : 'نوشتن'}
                   </button>
-                );
-              })}
+                ))}
+              </div>
+              <AccessPicker value={rule.access} onChange={(access) => setFile(index, { access })} />
+              <Button variant="muted" size="icon-xs" aria-label="حذف قاعده" onClick={() => change({ ...rules, files: rules.files.filter((_, i) => i !== index) })}>
+                <TrashIcon />
+              </Button>
             </div>
-          </Row>
-        ))}
-      </RowGroup>
-    </>
+          ))}
+          {rules.files.length === 0 && <p className="text-muted-foreground px-4 py-4 text-sm">قاعده‌ای نیست؛ یعنی همهٔ فایل‌ها آزادند.</p>}
+        </RowGroup>
+      </div>
+
+      <div>
+        <BlockLabel>ابزارها</BlockLabel>
+        <RowGroup>
+          {Object.entries({ execute: rules.tools.execute ?? 'allow', ...rules.tools }).map(([tool, access]) => (
+            <Row key={tool} label={toolLabel[tool] ?? tool} description={<span className="ltr-nums font-mono">{tool}</span>}>
+              <AccessPicker value={access} onChange={(value) => change({ ...rules, tools: { ...rules.tools, [tool]: value } })} />
+            </Row>
+          ))}
+        </RowGroup>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <p className="text-muted-foreground text-xs">حالت «فقط خواندن» و «خودکار» در کادر پیام این قوانین را سخت‌تر یا آسان‌تر می‌کند؛ «ممنوع» همیشه ممنوع می‌ماند.</p>
+        <Button size="sm" disabled={!dirty} onClick={save}>
+          <FloppyDiskIcon /> ذخیرهٔ قوانین
+        </Button>
+      </div>
+    </div>
   );
 }
 
-/* ───────────── Suggestions ───────────── */
+/* ───────────── Memory ───────────── */
 
-function Suggestions() {
-  const [items, setItems] = useState(initialSuggestions);
-  if (!items.length) return null;
+function Memory() {
+  const [text, setText] = useState<string | null>(null);
+  const [saved, setSaved] = useState('');
+  useEffect(() => {
+    api.get<{ content: string }>('/memory').then((memory) => {
+      setText(memory.content);
+      setSaved(memory.content);
+    });
+  }, []);
+  const save = async () => {
+    await api.put('/memory', { content: text });
+    setSaved(text ?? '');
+    toast.success('حافظه ذخیره شد.');
+  };
   return (
-    <div className="space-y-3">
-      <BlockLabel>پیشنهاد به‌روزرسانی از روی اصلاح‌های شما · قبل از اعمال تأیید کنید</BlockLabel>
-      {items.map((item) => (
-        <Block key={item.id} className="overflow-hidden p-0">
-          <div className="flex items-start gap-3 px-5 py-4">
-            <Glyph tone="warning">
-              <LightbulbIcon weight="fill" />
-            </Glyph>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold">به‌روزرسانی مهارت «{item.skill}»</div>
-              <p className="text-muted-foreground mt-0.5 text-sm">{item.reason}</p>
-            </div>
-          </div>
-          <div className="divide-border/70 grid divide-y border-t sm:grid-cols-2 sm:divide-x sm:divide-y-0 sm:divide-x-reverse">
-            <div className="px-5 py-3.5">
-              <div className="text-muted-foreground mb-1.5 text-xs font-medium">الان</div>
-              <p className="text-sm leading-7">
-                <span className="diff-del">{item.before}</span>
-              </p>
-            </div>
-            <div className="px-5 py-3.5">
-              <div className="text-muted-foreground mb-1.5 text-xs font-medium">پیشنهاد</div>
-              <p className="text-sm leading-7">
-                <span className="diff-add">{item.after}</span>
-              </p>
-            </div>
-          </div>
-          <div className="bg-surface flex justify-end gap-2 border-t px-5 py-3">
-            <Button variant="ghost" size="sm" onClick={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}>
-              <XIcon /> نادیده بگیر
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                setItems((prev) => prev.filter((i) => i.id !== item.id));
-                toast.success('مهارت به‌روز شد', { description: item.skill });
-              }}
-            >
-              <CheckIcon /> اعمال کن
-            </Button>
-          </div>
-        </Block>
-      ))}
+    <div className="mx-auto max-w-3xl">
+      <BlockLabel
+        action={
+          <Button size="xs" disabled={text === saved} onClick={save}>
+            <FloppyDiskIcon /> ذخیره
+          </Button>
+        }
+      >
+        چیزهایی که در هر کار به ایجنت داده می‌شود · ایجنت هم می‌تواند به آن اضافه کند
+      </BlockLabel>
+      <Textarea dir="auto" className="bg-popover min-h-[55vh] font-mono text-sm leading-7" value={text ?? ''} onChange={(e) => setText(e.target.value)} />
+      <p className="text-muted-foreground mt-2 text-xs">{fa((text ?? '').length)} نویسه · کوتاه نگهش دارید؛ هر خط در هر کار خوانده می‌شود.</p>
     </div>
   );
 }
 
 export default function CustomizePage() {
   return (
-    <Tabs defaultValue="teach" className="flex min-h-0 flex-1 flex-col">
+    <Tabs defaultValue="skills" className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title="سفارشی‌سازی"
         tabs={
           <TabsList>
-            <TabsTrigger value="teach">
-              <ChatTeardropTextIcon /> آموزش با حرف‌زدن
+            <TabsTrigger value="skills">
+              <WrenchIcon /> مهارت‌ها
             </TabsTrigger>
             <TabsTrigger value="agents">
               <RobotIcon /> ایجنت‌ها
             </TabsTrigger>
-            <TabsTrigger value="skills">
-              <WrenchIcon /> مهارت‌ها
-              <span className="bg-primary text-primary-foreground flex size-[18px] items-center justify-center rounded-full text-[11px]">{fa(initialSuggestions.length)}</span>
-            </TabsTrigger>
             <TabsTrigger value="rules">
               <ShieldCheckIcon /> قوانین و مجوزها
             </TabsTrigger>
-            <TabsTrigger value="automations">
-              <LightningIcon /> اتوماسیون‌ها
-            </TabsTrigger>
-            <TabsTrigger value="knowledge">
-              <BrainIcon /> دانش
+            <TabsTrigger value="memory">
+              <BrainIcon /> حافظه
             </TabsTrigger>
           </TabsList>
         }
       />
       <PageBody>
-        <TabsContent value="teach" className="py-6 outline-none">
-          <Teach />
-        </TabsContent>
-        <TabsContent value="agents" className="outline-none">
-          <AgentEditor />
-        </TabsContent>
-        {/* Suggested skill updates sit above the skills they would change. */}
-        <TabsContent value="skills" className="space-y-8 outline-none">
-          <Suggestions />
-          <div>
-            <Skills />
-          </div>
-        </TabsContent>
-        <TabsContent value="rules" className="outline-none">
-          <Rules />
-        </TabsContent>
-        <TabsContent value="automations" className="outline-none">
-          <Automations />
-        </TabsContent>
-        <TabsContent value="knowledge" className="outline-none">
-          <Knowledge />
-        </TabsContent>
+        <TabsContent value="skills" className="outline-none"><Skills /></TabsContent>
+        <TabsContent value="agents" className="outline-none"><Agents /></TabsContent>
+        <TabsContent value="rules" className="outline-none"><RulesEditor /></TabsContent>
+        <TabsContent value="memory" className="outline-none"><Memory /></TabsContent>
       </PageBody>
     </Tabs>
   );
