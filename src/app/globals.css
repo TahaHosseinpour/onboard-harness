@@ -1,0 +1,388 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@source "../";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* IRANYekan is a licensed font, so it is not shipped in the repo: the app uses the copy
+     installed on the machine (FaNum variant: Persian digits) and falls back to system fonts. */
+  --font-sans: 'IRANYekanXFaNum', 'IRANYekanX', 'IRANYekan', 'Vazirmatn', 'Segoe UI', Tahoma, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-strong: var(--primary-strong);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-hover: var(--hover);
+  --color-active: var(--active);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 28px;
+
+  --shadow-overlay: var(--elevation-overlay);
+  --shadow-float: var(--elevation-float);
+
+  --ease-default: cubic-bezier(0.2, 0, 0, 1);
+
+  --animate-shimmer: shimmer 1.8s linear infinite;
+  --animate-pulse-dot: pulse-dot 1.4s ease-in-out infinite;
+
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.8);
+    }
+  }
+}
+
+/* Light: every neutral leans toward the brand violet, so greys, borders and
+   hovers sit in the same family as the purple instead of fighting it. */
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #1b1b29;
+  --surface: #f8f8fd;
+  --card: #ffffff;
+  --card-foreground: #1b1b29;
+  --popover: #ffffff;
+  --popover-foreground: #1b1b29;
+  --primary: #5058c9;
+  --primary-foreground: #ffffff;
+  --primary-soft: #ecedfb;
+  --primary-strong: #434ab3;
+  --secondary: #eeeef8;
+  --secondary-foreground: #1b1b29;
+  --muted: #f2f2fa;
+  --muted-foreground: #696c83;
+  --accent: #f3f3fb;
+  --accent-foreground: #1b1b29;
+  --destructive: #c23650;
+  --border: #e4e5f1;
+  --input: #d7d8e8;
+  --ring: #5058c9;
+  --hover: rgb(80 88 201 / 0.07);
+  --active: rgb(80 88 201 / 0.13);
+  --sidebar: #f4f4fb;
+  --sidebar-foreground: #1b1b29;
+  --sidebar-border: #e4e5f1;
+
+  /* Status hues are pulled toward the cool side so they read as relatives of the violet. */
+  --success: #17795a;
+  --success-soft: #dcf3ea;
+  --warning: #94600e;
+  --warning-soft: #fbefd6;
+  --danger: #c23650;
+  --danger-soft: #fbe3e8;
+  --info: #4a52c4;
+  --info-soft: #e8e9fb;
+
+  --chart-1: #5058c9;
+  --chart-2: #9d8ff0;
+  --chart-3: #2a9fb4;
+  --chart-4: #d9609d;
+  --chart-5: #e0935a;
+
+  --elevation-overlay: 0 12px 32px -8px rgb(40 44 110 / 0.18), 0 2px 6px -2px rgb(40 44 110 / 0.08);
+  --elevation-float: 0 1px 2px rgb(40 44 110 / 0.05), 0 6px 20px -8px rgb(40 44 110 / 0.12);
+}
+
+/* Dark: midnight surfaces with the same violet undertone. */
+.dark {
+  color-scheme: dark;
+  --background: #0a0a10;
+  --foreground: #f4f4fb;
+  --surface: #101018;
+  --card: #12121b;
+  --card-foreground: #f4f4fb;
+  --popover: #1a1a26;
+  --popover-foreground: #f4f4fb;
+  --primary: #6570e0;
+  --primary-foreground: #ffffff;
+  --primary-soft: rgb(110 122 235 / 0.17);
+  --primary-strong: #7f89ee;
+  --secondary: #1f1f2c;
+  --secondary-foreground: #d5d7ea;
+  --muted: #181823;
+  --muted-foreground: #8d90a8;
+  --accent: #1d1d2a;
+  --accent-foreground: #ffffff;
+  --destructive: #ef6480;
+  --border: #252535;
+  --input: #303043;
+  --ring: #6570e0;
+  --hover: rgb(130 140 245 / 0.09);
+  --active: rgb(130 140 245 / 0.17);
+  --sidebar: #11111a;
+  --sidebar-foreground: #d5d7ea;
+  --sidebar-border: #252535;
+
+  --success: #3dbd8f;
+  --success-soft: rgb(61 189 143 / 0.15);
+  --warning: #e3a84a;
+  --warning-soft: rgb(227 168 74 / 0.15);
+  --danger: #f07a92;
+  --danger-soft: rgb(240 100 128 / 0.16);
+  --info: #8f98f0;
+  --info-soft: rgb(110 122 235 / 0.17);
+
+  --chart-1: #7f89ee;
+  --chart-2: #b5a9f7;
+  --chart-3: #3bbdd2;
+  --chart-4: #e77fb3;
+  --chart-5: #eba672;
+
+  --elevation-overlay: 0 8px 36px 0 rgb(0 0 0 / 0.6), 0 0 0 1px rgb(160 165 255 / 0.05);
+  --elevation-float: 0 6px 24px -8px rgb(0 0 0 / 0.6);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 28%, transparent);
+  }
+
+  html {
+    @apply font-sans;
+    /* One knob for overall scale: every rem-based size follows it. */
+    font-size: 17px;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-sidebar text-foreground;
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    overflow: hidden;
+  }
+
+  /* Tailwind v4 resets buttons to the default cursor. */
+  :is(a[href], button, [role='button'], [role='tab'], [role='menuitem'], [role='option'], [role='switch'], label[for], summary):not(
+      :disabled
+    ):not([data-disabled]) {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply text-foreground font-semibold;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Latin / numeric runs that must keep their own direction inside Persian text */
+@utility ltr-nums {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+@utility scrollbar-minimal {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  &:hover {
+    scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent;
+  }
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility text-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted-foreground) 35%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 65%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: var(--animate-shimmer);
+}
+
+/* Electron: the title bar drags the window; anything interactive opts out. */
+.app-drag {
+  -webkit-app-region: drag;
+}
+.app-no-drag,
+.app-drag :is(button, a, input, [role='button']) {
+  -webkit-app-region: no-drag;
+}
+/* Electron only: an empty strip that clears the native window controls and drags the window. */
+.desktop-strip {
+  display: none;
+}
+.is-desktop .desktop-strip {
+  display: block;
+  height: 36px;
+  flex-shrink: 0;
+}
+.is-desktop .shell-body {
+  padding-top: 0;
+}
+
+/* Sonner */
+[data-sonner-toaster] {
+  font-family: var(--font-sans);
+}
+[data-sonner-toaster] [data-sonner-toast] {
+  font-family: var(--font-sans);
+  background: var(--popover);
+  border: 1px solid var(--border);
+  color: var(--popover-foreground);
+  box-shadow: var(--elevation-overlay);
+  border-radius: 20px;
+}
+[data-sonner-toaster] [data-sonner-toast] [data-description] {
+  color: var(--muted-foreground);
+}
+
+/* Tiptap document body */
+.doc-prose {
+  font-size: 15px;
+  line-height: 2;
+  outline: none;
+}
+.doc-prose > :first-child {
+  margin-top: 0;
+}
+.doc-prose h1 {
+  font-size: 1.6em;
+  margin: 1.2em 0 0.5em;
+  line-height: 1.5;
+}
+.doc-prose h2 {
+  font-size: 1.25em;
+  margin: 1.4em 0 0.5em;
+}
+.doc-prose h3 {
+  font-size: 1.08em;
+  margin: 1.2em 0 0.4em;
+}
+.doc-prose p {
+  margin: 0.7em 0;
+}
+.doc-prose ul,
+.doc-prose ol {
+  margin: 0.7em 0;
+  padding-inline-start: 1.5em;
+}
+.doc-prose ul {
+  list-style: disc;
+}
+.doc-prose ol {
+  list-style: decimal;
+}
+.doc-prose blockquote {
+  margin: 1em 0;
+  border-inline-start: 3px solid var(--primary);
+  padding-inline-start: 1em;
+  color: var(--muted-foreground);
+}
+.doc-prose strong {
+  font-weight: 600;
+}
+.doc-prose hr {
+  margin: 1.6em 0;
+  border-color: var(--border);
+}
+
+/* Diff marks used in approvals and skill suggestions */
+.diff-add {
+  background: var(--success-soft);
+  color: var(--success);
+  border-radius: 4px;
+  padding: 0 3px;
+  text-decoration: none;
+}
+.diff-del {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: 4px;
+  padding: 0 3px;
+  text-decoration: line-through;
+}
+
+/* AG Grid picks up the app font and digits */
+.ag-root-wrapper {
+  font-family: var(--font-sans) !important;
+}
+
+/* Recharts: no focus rectangles around chart surfaces */
+.recharts-wrapper :focus {
+  outline: none;
+}
