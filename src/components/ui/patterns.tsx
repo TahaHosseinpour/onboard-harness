@@ -8,6 +8,15 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
+/** The one navigation row: main sidebar, settings menu and files tree all use it,
+ *  so a sub-menu never looks like a different component from the menu beside it.
+ *  No hover transition: these rows are hit all day and an animated highlight lags the pointer. */
+export const navRow =
+  'group/row text-muted-foreground hover:bg-hover hover:text-foreground data-[active=true]:bg-active data-[active=true]:text-foreground relative flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-[0.8125rem] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/40 [&_svg]:size-[18px] [&_svg]:shrink-0';
+
+/** Secondary menu column inside a page (settings sections, folder tree). */
+export const subNav = 'bg-sidebar/60 scrollbar-minimal w-[232px] shrink-0 space-y-0.5 overflow-y-auto border-e p-2';
+
 /** Muted heading above a block ("What changed", "Actions"). */
 export function BlockLabel({ className, children, action }: { className?: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (

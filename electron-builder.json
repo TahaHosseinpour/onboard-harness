@@ -1,0 +1,37 @@
+{
+  "appId": "ir.onboard.harness",
+  "productName": "Onboard Harness",
+  "copyright": "Copyright © 2026 Taha Hosseinpour",
+  "electronVersion": "44.7.0",
+  "directories": {
+    "app": "release/app",
+    "buildResources": "build",
+    "output": "release/dist"
+  },
+  "files": ["electron/**", "out/**", "package.json", "!**/node_modules/**", "!**/*.map"],
+  "asar": true,
+  "npmRebuild": false,
+  "win": {
+    "target": [
+      { "target": "nsis", "arch": ["x64"] },
+      { "target": "zip", "arch": ["x64"] }
+    ],
+    "icon": "build/icon.ico",
+    "signExecutable": false,
+    "artifactName": "Onboard-Harness-${version}-win-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico",
+    "installerHeaderIcon": "build/icon.ico",
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Onboard Harness",
+    "uninstallDisplayName": "Onboard Harness",
+    "deleteAppDataOnUninstall": false,
+    "artifactName": "Onboard-Harness-Setup-${version}.${ext}"
+  }
+}

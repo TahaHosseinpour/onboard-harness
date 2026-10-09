@@ -22,15 +22,17 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Connections } from '@/components/sections/connections';
+import { Models } from '@/components/sections/models';
 import { PageHeader } from '@/components/shell/page';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/overlays';
-import { BlockLabel, Row, RowGroup } from '@/components/ui/patterns';
+import { BlockLabel, navRow, Row, RowGroup, subNav } from '@/components/ui/patterns';
 import { Badge, Dot, Glyph, Input, Progress, Segmented, Switch } from '@/components/ui/primitives';
-import { agents, devices, members, models, units } from '@/lib/mock';
+import { agents, devices, members, units } from '@/lib/mock';
+import { useUi, type SettingsTab } from '@/lib/store';
 import { cn, fa, toman } from '@/lib/utils';
 
-type Tab = 'general' | 'connections' | 'access' | 'models' | 'budget' | 'members' | 'devices';
+type Tab = SettingsTab;
 
 const tabs: { id: Tab; label: string; icon: Icon }[] = [
   { id: 'general', label: 'عمومی', icon: GlobeIcon },
@@ -90,40 +92,11 @@ function General() {
             ['وقتی تأیید من لازم است', 'اعلان دسکتاپ و صدای کوتاه', true],
             ['وقتی ناهنجاری پیدا شد', 'افت فروش، افزایش هزینه و مانند آن', true],
             ['وقتی کاری تمام شد', 'فقط برای کارهایی که خودم شروع کرده‌ام', true],
-            ['خلاصهٔ روزانه', 'هر روز ساعت ۰۸:۳۰', false],
           ].map(([label, description, on]) => (
             <Row key={label as string} leading={<BellIcon className="text-muted-foreground size-5" />} label={label} description={description}>
               <Switch defaultChecked={on as boolean} />
             </Row>
           ))}
-        </RowGroup>
-      </div>
-    </div>
-  );
-}
-
-function Models() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <BlockLabel>مدل هر ایجنت</BlockLabel>
-        <RowGroup>
-          {agents.map((agent) => (
-            <Row key={agent.id} leading={<Glyph tone={agent.tone}>{agent.initial}</Glyph>} label={agent.name} description={agent.role}>
-              <Select defaultValue={agent.model} options={models} className="w-48" />
-            </Row>
-          ))}
-        </RowGroup>
-      </div>
-      <div>
-        <BlockLabel>پیش‌فرض‌ها</BlockLabel>
-        <RowGroup>
-          <Row label="مدل پیش‌فرض ایجنت‌های جدید">
-            <Select defaultValue="Sonnet 5.5" options={models} className="w-48" />
-          </Row>
-          <Row label="استفادهٔ خودکار از مدل ارزان‌تر" description="برای کارهای ساده مثل خلاصه‌سازی و دسته‌بندی">
-            <Switch defaultChecked />
-          </Row>
         </RowGroup>
       </div>
     </div>
@@ -281,7 +254,8 @@ const panes: Record<Tab, () => React.ReactNode> = {
   models: Models, budget: Budget, members: Members, devices: Devices };
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<Tab>('general');
+  const tab = useUi((s) => s.settingsTab);
+  const setTab = useUi((s) => s.setSettingsTab);
   const current = tabs.find((t) => t.id === tab)!;
   const Pane = panes[tab];
 
@@ -289,21 +263,21 @@ export default function SettingsPage() {
     <>
       <PageHeader title="تنظیمات" meta={current.label} />
       <div className="flex min-h-0 flex-1">
-        <nav className="bg-surface/60 w-[220px] shrink-0 space-y-0.5 border-e p-2">
+        <nav className={subNav}>
           {tabs.map((item) => (
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
               data-active={tab === item.id}
-              className="text-muted-foreground hover:bg-hover hover:text-foreground data-[active=true]:bg-active data-[active=true]:text-foreground flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium"
+              className={navRow}
             >
-              <item.icon weight={tab === item.id ? 'fill' : 'bold'} className={cn('size-5', tab === item.id && 'text-primary')} />
+              <item.icon weight={tab === item.id ? 'fill' : 'bold'} className={cn(tab === item.id && 'text-primary')} />
               {item.label}
             </button>
           ))}
         </nav>
         <div className="scrollbar-minimal min-w-0 flex-1 overflow-y-auto">
-          <div className={cn('mx-auto px-6 py-6', tab === 'connections' || tab === 'access' ? 'max-w-5xl' : 'max-w-3xl')}>
+          <div className={cn('mx-auto px-6 py-6', tab === 'connections' || tab === 'access' || tab === 'models' ? 'max-w-5xl' : 'max-w-3xl')}>
             <Pane />
           </div>
         </div>

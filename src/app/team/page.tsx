@@ -171,7 +171,7 @@ export default function TeamPage() {
                     <Badge tone={agentStatus[agent.status].tone}>{agentStatus[agent.status].label}</Badge>
                   </span>
                 }
-                description={`${agent.role} · واحد ${agent.unit} · مدیر: ${agent.manager} · مدل ${agent.model}`}
+                description={`${agent.role} · واحد ${agent.unit} · مدیر: ${agent.manager}`}
               >
                 <div className="hidden gap-1.5 lg:flex">
                   {agent.skills.slice(0, 2).map((skill) => (

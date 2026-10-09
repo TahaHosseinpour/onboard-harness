@@ -1,12 +1,14 @@
 'use client';
 
-import { ArrowUpIcon, CaretDownIcon, CheckIcon, CloudIcon, DesktopIcon, PaperclipIcon, StopIcon } from '@phosphor-icons/react';
+import { ArrowUpIcon, CaretDownIcon, CheckIcon, CloudIcon, CpuIcon, DesktopIcon, GearSixIcon, PaperclipIcon, StopIcon } from '@phosphor-icons/react';
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from '@/components/ui/overlays';
+import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@/components/ui/overlays';
 import { Glyph, Hint } from '@/components/ui/primitives';
 import { agents } from '@/lib/mock';
+import { useUi } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
 export type RunPlace = 'local' | 'cloud';
@@ -30,7 +32,7 @@ export function Composer({
   large,
   className,
 }: {
-  onSend: (text: string, options: { agent: string; place: RunPlace }) => void;
+  onSend: (text: string, options: { agent: string; place: RunPlace; model: string }) => void;
   onStop?: () => void;
   busy?: boolean;
   placeholder?: string;
@@ -41,13 +43,19 @@ export function Composer({
   const [text, setText] = useState('');
   const [agent, setAgent] = useState('auto');
   const [place, setPlace] = useState<RunPlace>('local');
+  // The model is chosen here, per message, from the ones defined in Settings; it does not belong to an agent.
+  const models = useUi((s) => s.models);
+  const defaultModelId = useUi((s) => s.defaultModelId);
+  const setSettingsTab = useUi((s) => s.setSettingsTab);
+  const [modelId, setModelId] = useState<string | null>(null);
+  const model = models.find((m) => m.id === (modelId ?? defaultModelId)) ?? models[0];
   const PlaceIcon = places[place].icon;
   const selectedAgent = agents.find((a) => a.id === agent);
 
   const send = () => {
     const value = text.trim();
     if (!value) return;
-    onSend(value, { agent, place });
+    onSend(value, { agent, place, model: model?.id ?? '' });
     setText('');
   };
 
@@ -126,6 +134,33 @@ export function Composer({
                 </MenuItem>
               );
             })}
+          </MenuContent>
+        </Menu>
+
+        <Menu>
+          <MenuTrigger className={toolbarButton}>
+            <CpuIcon />
+            {model ? model.name : 'بدون مدل'}
+            <CaretDownIcon className="size-3!" />
+          </MenuTrigger>
+          <MenuContent align="start" side="top" className="w-72">
+            <MenuLabel>مدل این پیام</MenuLabel>
+            {models.map((m) => (
+              <MenuItem key={m.id} onSelect={() => setModelId(m.id)} className="h-auto py-1.5">
+                <span className="min-w-0 flex-1 leading-tight">
+                  <span className="block">{m.name}</span>
+                  <span className="text-muted-foreground ltr-nums block truncate text-end font-mono text-[11px]">{m.model}</span>
+                </span>
+                {model?.id === m.id && <CheckIcon className="text-primary!" />}
+              </MenuItem>
+            ))}
+            <MenuSeparator />
+            <MenuItem asChild>
+              <Link href="/settings" onClick={() => setSettingsTab('models')}>
+                <GearSixIcon />
+                تعریف و مدیریت مدل‌ها
+              </Link>
+            </MenuItem>
           </MenuContent>
         </Menu>
 

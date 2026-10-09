@@ -12,6 +12,7 @@ import {
   SignOutIcon,
   UserCircleIcon,
 } from '@phosphor-icons/react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -22,22 +23,16 @@ import { Dialog, DialogClose, DialogContent, Menu, MenuContent, MenuItem, MenuLa
 import { Dot, Glyph, Hint, Input, Kbd, Label } from '@/components/ui/primitives';
 import { agentById, APP_NAME, me, notifications, org, tasks, taskStatus, workspace } from '@/lib/mock';
 import { useUi } from '@/lib/store';
+import { navRow } from '@/components/ui/patterns';
 import { cn } from '@/lib/utils';
 import { navItems } from './nav';
 
-// No hover transition on rows: they are hit all day, and an animated highlight lags the pointer.
-const rowClass =
-  'group/row text-muted-foreground hover:bg-hover hover:text-sidebar-foreground data-[active=true]:bg-active data-[active=true]:text-foreground relative flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-[0.8125rem] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/40 [&_svg]:size-[18px] [&_svg]:shrink-0';
+const rowClass = navRow;
 const railRow = 'justify-center px-0';
 
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <span className={cn('bg-primary inline-flex size-7 shrink-0 items-center justify-center rounded-full', className)}>
-      <svg viewBox="0 0 16 16" className="size-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <circle cx="8" cy="8" r="2.2" fill="currentColor" stroke="none" />
-        <path d="M8 1.8v2.4M8 11.8v2.4M1.8 8h2.4M11.8 8h2.4" />
-      </svg>
-    </span>
+    <Image src="/logo.png" alt="" width={28} height={28} priority className={cn('size-7 shrink-0 object-contain', className)} />
   );
 }
 

@@ -1,28 +1,27 @@
 'use client';
 
-import { ArrowRightIcon, CalendarCheckIcon, CheckIcon, ClockIcon, LightningIcon, PlayIcon, SparkleIcon } from '@phosphor-icons/react';
+import { ArrowRightIcon, CheckIcon, LightningIcon, PlayIcon, SparkleIcon } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { AgentChip } from '@/components/shared/bits';
 import { Button } from '@/components/ui/button';
 import { Block, BlockLabel, MetaDot, Row, RowGroup } from '@/components/ui/patterns';
-import { Badge, Glyph, Input, Segmented, Switch } from '@/components/ui/primitives';
+import { Badge, Glyph, Input, Switch } from '@/components/ui/primitives';
 import { agentById, automations, runHistory, runStatus } from '@/lib/mock';
 import { fa, toman } from '@/lib/utils';
 
 type Automation = (typeof automations)[number];
 
 function Detail({ item, enabled, onToggle, onBack }: { item: Automation; enabled: boolean; onToggle: (v: boolean) => void; onBack: () => void }) {
-  const Icon = item.trigger === 'schedule' ? ClockIcon : LightningIcon;
   return (
     <div className="mx-auto max-w-3xl">
       <button onClick={onBack} className="text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1.5 text-sm">
         <ArrowRightIcon className="size-4" /> اتوماسیون‌ها
       </button>
       <div className="flex items-center gap-3">
-        <Glyph size="lg" tone={item.trigger === 'schedule' ? 'info' : 'warning'}>
-          <Icon weight="fill" />
+        <Glyph size="lg" tone="warning">
+          <LightningIcon weight="fill" />
         </Glyph>
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold">{item.name}</h1>
@@ -34,11 +33,7 @@ function Detail({ item, enabled, onToggle, onBack }: { item: Automation; enabled
         <Switch checked={enabled} onCheckedChange={onToggle} aria-label="فعال" />
       </div>
 
-      <div className="mt-6 grid gap-2 sm:grid-cols-3">
-        <Block className="py-3">
-          <div className="text-muted-foreground text-xs">نوع</div>
-          <div className="mt-0.5 text-sm font-medium">{item.trigger === 'schedule' ? 'زمان‌بندی‌شده' : 'رویدادمحور'}</div>
-        </Block>
+      <div className="mt-6 grid gap-2 sm:grid-cols-2">
         <Block className="py-3">
           <div className="text-muted-foreground text-xs">اجراکننده</div>
           <AgentChip id={item.agent} className="mt-1 [&>span:last-child]:text-sm [&>span:last-child]:font-medium" />
@@ -86,7 +81,6 @@ function Detail({ item, enabled, onToggle, onBack }: { item: Automation; enabled
 export function Automations() {
   const [enabled, setEnabled] = useState<Record<string, boolean>>(() => Object.fromEntries(automations.map((a) => [a.id, a.enabled])));
   const [selected, setSelected] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'schedule' | 'event'>('all');
   const [prompt, setPrompt] = useState('');
   const [draft, setDraft] = useState<string | null>(null);
 
@@ -96,7 +90,6 @@ export function Automations() {
   };
 
   const item = automations.find((a) => a.id === selected);
-  const visible = automations.filter((a) => filter === 'all' || a.trigger === filter);
 
   return (
     <>
@@ -112,7 +105,7 @@ export function Automations() {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && prompt.trim() && setDraft(prompt.trim())}
-                placeholder="اتوماسیون را با یک جمله بسازید؛ مثلاً «هر روز ساعت ۹ خلاصهٔ تیکت‌های دیروز را برایم بفرست»"
+                placeholder="اتوماسیون را با یک جمله بسازید؛ مثلاً «وقتی تیکت جدیدی ثبت شد، یک پاسخ اولیه بنویس»"
                 className="h-10 border-0 bg-transparent px-0 focus-visible:ring-0"
               />
               <Button disabled={!prompt.trim()} onClick={() => setDraft(prompt.trim())}>
@@ -125,10 +118,10 @@ export function Automations() {
                 <div className="mt-2 text-sm font-medium">«{draft}»</div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Badge tone="info">
-                    <CalendarCheckIcon /> هر روز ساعت ۰۹:۰۰
+                    <LightningIcon /> وقتی تیکت جدیدی ثبت شد
                   </Badge>
                   <Badge tone="primary">اجراکننده: پشتیبان مشتری</Badge>
-                  <Badge tone="success">فقط خواندن · بدون نیاز به تأیید</Badge>
+                  <Badge tone="warning">ارسال پاسخ · با تأیید</Badge>
                 </div>
                 <div className="mt-4 flex justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setDraft(null)}>
@@ -149,26 +142,15 @@ export function Automations() {
             )}
           </div>
 
-          <Segmented
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { value: 'all', label: 'همه' },
-              { value: 'schedule', label: 'زمان‌بندی‌شده', icon: <ClockIcon /> },
-              { value: 'event', label: 'رویدادمحور', icon: <LightningIcon /> },
-            ]}
-          />
-
           <RowGroup>
-            {visible.map((a) => {
-              const Icon = a.trigger === 'schedule' ? ClockIcon : LightningIcon;
+            {automations.map((a) => {
               return (
                 <Row
                   key={a.id}
                   onClick={() => setSelected(a.id)}
                   leading={
-                    <Glyph tone={a.trigger === 'schedule' ? 'info' : 'warning'}>
-                      <Icon weight="fill" />
+                    <Glyph tone="warning">
+                      <LightningIcon weight="fill" />
                     </Glyph>
                   }
                   label={a.name}

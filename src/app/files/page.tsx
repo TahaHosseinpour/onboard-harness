@@ -35,7 +35,7 @@ import { toast } from 'sonner';
 import { SalesColumns, SlideDeck } from '@/components/shared/viewers';
 import { PageHeader } from '@/components/shell/page';
 import { Button } from '@/components/ui/button';
-import { EmptyNote, MetaDot, Table, TBody, Td, Th, THead, Tr } from '@/components/ui/patterns';
+import { EmptyNote, MetaDot, navRow, subNav, Table, TBody, Td, Th, THead, Tr } from '@/components/ui/patterns';
 import { Badge, Hint, Input, Segmented, Switch } from '@/components/ui/primitives';
 import { files, folderPath, folders, systemFiles, systemFolders, versions, workspace, type FileItem, type FileKind, type SystemKind } from '@/lib/mock';
 import { useUi } from '@/lib/store';
@@ -193,9 +193,6 @@ type Entry = {
   open: () => void;
 };
 
-const navRow =
-  'text-muted-foreground hover:bg-hover hover:text-foreground data-[active=true]:bg-active data-[active=true]:text-foreground flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm';
-
 export default function FilesPage() {
   const router = useRouter();
   const openFileId = useUi((s) => s.openFileId);
@@ -275,16 +272,16 @@ export default function FilesPage() {
       />
       <div className="flex min-h-0 flex-1">
         {/* Folder tree of the workspace */}
-        <aside className="bg-surface/60 scrollbar-minimal w-[240px] shrink-0 overflow-y-auto border-e p-2">
-          <button onClick={() => setFolder('all')} data-active={folder === 'all'} className={cn(navRow, 'text-foreground font-medium')}>
-            <HardDrivesIcon weight={folder === 'all' ? 'fill' : 'bold'} className={cn('size-[18px]', folder === 'all' && 'text-primary')} />
+        <aside className={subNav}>
+          <button onClick={() => setFolder('all')} data-active={folder === 'all'} className={cn(navRow, 'text-foreground')}>
+            <HardDrivesIcon weight={folder === 'all' ? 'fill' : 'bold'} className={cn(folder === 'all' && 'text-primary')} />
             <span className="truncate">{workspace.name}</span>
             <span className="text-muted-foreground ms-auto text-xs">{fa(entries.length)}</span>
           </button>
-          <div className="border-border/80 ms-[17px] mt-0.5 space-y-0.5 border-s ps-1.5">
+          <div className="border-border/80 ms-[17px] space-y-0.5 border-s ps-1.5">
             {folders.map((f) => (
               <button key={f.id} onClick={() => setFolder(f.id)} data-active={folder === f.id} className={navRow}>
-                <FolderSimpleIcon weight={folder === f.id ? 'fill' : 'bold'} className={cn('size-[18px] shrink-0', folder === f.id && 'text-primary')} />
+                <FolderSimpleIcon weight={folder === f.id ? 'fill' : 'bold'} className={cn(folder === f.id && 'text-primary')} />
                 <span className="truncate">{f.name}</span>
                 <span className="ms-auto text-xs">{fa(f.count)}</span>
               </button>
@@ -299,7 +296,7 @@ export default function FilesPage() {
                   const SysIcon = systemMeta[f.id].icon;
                   return (
                     <button key={f.id} onClick={() => setFolder(f.id)} data-active={folder === f.id} className={navRow}>
-                      <SysIcon weight={folder === f.id ? 'fill' : 'bold'} className="text-primary size-[18px] shrink-0" />
+                      <SysIcon weight={folder === f.id ? 'fill' : 'bold'} className="text-primary" />
                       <span className="truncate">{f.name}</span>
                       <span className="ms-auto text-xs">{fa(systemFiles.filter((s) => s.kind === f.id).length)}</span>
                     </button>

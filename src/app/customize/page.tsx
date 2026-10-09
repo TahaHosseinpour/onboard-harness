@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Select, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/overlays';
 import { Block, BlockLabel, ListRow, MetaDot, Row, RowGroup } from '@/components/ui/patterns';
 import { Badge, Glyph, Input, Label, Segmented, Switch, Textarea } from '@/components/ui/primitives';
-import { accessMeta, agents, connections, models, rules as initialRules, skills, suggestions as initialSuggestions, type Access } from '@/lib/mock';
+import { accessMeta, agents, connections, rules as initialRules, skills, suggestions as initialSuggestions, type Access } from '@/lib/mock';
 import { cn, fa, toman } from '@/lib/utils';
 
 /* ───────────── Teach by talking ───────────── */
@@ -39,7 +39,7 @@ const kindMeta: Record<Kind, { label: string; icon: typeof WrenchIcon; tone: 'pr
 const examples: { text: string; kind: Kind }[] = [
   { text: 'هیچ‌وقت بدون تأیید من به مشتری ایمیل نفرست', kind: 'rule' },
   { text: 'گزارش‌ها را همیشه با یک خلاصهٔ سه‌خطی شروع کن', kind: 'skill' },
-  { text: 'هر شنبه صبح فروش هفتهٔ قبل را برایم بفرست', kind: 'automation' },
+  { text: 'وقتی موجودی کالایی کم شد خبرم کن', kind: 'automation' },
 ];
 
 function Teach() {
@@ -47,7 +47,7 @@ function Teach() {
   const [draft, setDraft] = useState<{ text: string; kind: Kind } | null>(null);
   const [layer, setLayer] = useState('unit');
 
-  const guess = (value: string): Kind => (/هر (روز|هفته|شنبه|ماه)|ساعت/.test(value) ? 'automation' : /هیچ‌وقت|نکن|نفرست|ممنوع|بدون تأیید/.test(value) ? 'rule' : 'skill');
+  const guess = (value: string): Kind => (/^(وقتی|هر وقت|هر بار|هنگامی که)/.test(value.trim()) ? 'automation' : /هیچ‌وقت|نکن|نفرست|ممنوع|بدون تأیید/.test(value) ? 'rule' : 'skill');
   const submit = (value = text) => value.trim() && setDraft({ text: value.trim(), kind: guess(value) });
   const meta = draft && kindMeta[draft.kind];
 
@@ -134,7 +134,7 @@ function Teach() {
                 <>
                   <strong className="font-semibold">اتوماسیون:</strong> {draft.text}
                   <div className="mt-2 flex gap-2">
-                    <Badge tone="info">شنبه‌ها ۰۸:۰۰</Badge>
+                    <Badge tone="info">با رخ‌دادن همین رویداد</Badge>
                     <Badge tone="primary">تحلیلگر فروش</Badge>
                   </div>
                 </>
@@ -257,9 +257,6 @@ function AgentEditor() {
         <div>
           <BlockLabel>تنظیمات</BlockLabel>
           <RowGroup>
-            <Row label="مدل" description="مدل‌های قوی‌تر دقیق‌تر و گران‌ترند">
-              <Select defaultValue={agent.model} options={models} className="w-44" />
-            </Row>
             <Row label="سقف هزینهٔ ماهانه" description={`مصرف تا امروز: ${toman(agent.spent)}`}>
               <Input defaultValue={toman(agent.budget, false)} className="w-44" />
             </Row>

@@ -15,7 +15,6 @@ export type Agent = {
   unit: string;
   tone: Tone | 'chart2' | 'chart3' | 'chart4';
   initial: string;
-  model: string;
   status: 'working' | 'idle' | 'waiting' | 'paused';
   budget: number;
   spent: number;
@@ -24,11 +23,11 @@ export type Agent = {
 };
 
 export const agents: Agent[] = [
-  { id: 'sales', name: 'تحلیلگر فروش', role: 'تحلیل فروش و پیش‌بینی', unit: 'فروش', tone: 'primary', initial: 'ف', model: 'Opus 5.5', status: 'working', budget: 12_000_000, spent: 7_400_000, skills: ['گزارش هفتگی فروش', 'تحلیل ریزش مشتری', 'پیش‌بینی تقاضا'], manager: 'مریم صادقی' },
-  { id: 'marketing', name: 'دستیار مارکتینگ', role: 'کمپین و محتوا', unit: 'مارکتینگ', tone: 'chart4', initial: 'م', model: 'Sonnet 5.5', status: 'waiting', budget: 18_000_000, spent: 15_900_000, skills: ['ساخت کمپین پیامکی', 'تقویم محتوا', 'تحلیل رقبا'], manager: 'آرش کریمی' },
-  { id: 'finance', name: 'حسابدار', role: 'مالی و تطبیق حساب', unit: 'مالی', tone: 'chart2', initial: 'ح', model: 'Opus 5.5', status: 'idle', budget: 8_000_000, spent: 2_100_000, skills: ['تطبیق بانکی', 'گزارش جریان نقدی', 'کنترل فاکتورها'], manager: 'الهام نوری' },
-  { id: 'support', name: 'پشتیبان مشتری', role: 'پاسخ به تیکت‌ها', unit: 'پشتیبانی', tone: 'success', initial: 'پ', model: 'Haiku 5.5', status: 'working', budget: 6_000_000, spent: 3_300_000, skills: ['پاسخ به تیکت', 'جمع‌بندی شکایت‌ها'], manager: 'سینا احمدی' },
-  { id: 'ops', name: 'هماهنگ‌کننده عملیات', role: 'موجودی و تأمین', unit: 'عملیات', tone: 'chart3', initial: 'ع', model: 'Sonnet 5.5', status: 'paused', budget: 9_000_000, spent: 4_800_000, skills: ['پایش موجودی', 'سفارش تأمین‌کننده'], manager: 'نیما رستگار' },
+  { id: 'sales', name: 'تحلیلگر فروش', role: 'تحلیل فروش و پیش‌بینی', unit: 'فروش', tone: 'primary', initial: 'ف', status: 'working', budget: 12_000_000, spent: 7_400_000, skills: ['گزارش هفتگی فروش', 'تحلیل ریزش مشتری', 'پیش‌بینی تقاضا'], manager: 'مریم صادقی' },
+  { id: 'marketing', name: 'دستیار مارکتینگ', role: 'کمپین و محتوا', unit: 'مارکتینگ', tone: 'chart4', initial: 'م', status: 'waiting', budget: 18_000_000, spent: 15_900_000, skills: ['ساخت کمپین پیامکی', 'تقویم محتوا', 'تحلیل رقبا'], manager: 'آرش کریمی' },
+  { id: 'finance', name: 'حسابدار', role: 'مالی و تطبیق حساب', unit: 'مالی', tone: 'chart2', initial: 'ح', status: 'idle', budget: 8_000_000, spent: 2_100_000, skills: ['تطبیق بانکی', 'گزارش جریان نقدی', 'کنترل فاکتورها'], manager: 'الهام نوری' },
+  { id: 'support', name: 'پشتیبان مشتری', role: 'پاسخ به تیکت‌ها', unit: 'پشتیبانی', tone: 'success', initial: 'پ', status: 'working', budget: 6_000_000, spent: 3_300_000, skills: ['پاسخ به تیکت', 'جمع‌بندی شکایت‌ها'], manager: 'سینا احمدی' },
+  { id: 'ops', name: 'هماهنگ‌کننده عملیات', role: 'موجودی و تأمین', unit: 'عملیات', tone: 'chart3', initial: 'ع', status: 'paused', budget: 9_000_000, spent: 4_800_000, skills: ['پایش موجودی', 'سفارش تأمین‌کننده'], manager: 'نیما رستگار' },
 ];
 
 export const agentById = (id: string) => agents.find((a) => a.id === id) ?? agents[0];
@@ -350,19 +349,17 @@ export const experimentStatus = {
 /* ───────────── Automations ───────────── */
 
 export const automations = [
-  { id: 'au1', name: 'گزارش هفتگی فروش', trigger: 'schedule' as const, when: 'شنبه‌ها ساعت ۰۸:۰۰', agent: 'sales', enabled: true, lastRun: 'شنبه ۰۸:۰۰', lastStatus: 'ok' as const, runs: 29 },
-  { id: 'au2', name: 'تطبیق بانکی روزانه', trigger: 'schedule' as const, when: 'هر روز ساعت ۰۷:۳۰', agent: 'finance', enabled: true, lastRun: 'امروز ۰۷:۳۰', lastStatus: 'ok' as const, runs: 214 },
   { id: 'au3', name: 'هشدار افت موجودی', trigger: 'event' as const, when: 'وقتی موجودی کالایی کمتر از ۵ روز فروش شد', agent: 'ops', enabled: true, lastRun: 'دیروز ۱۶:۴۲', lastStatus: 'approval' as const, runs: 37 },
   { id: 'au4', name: 'پاسخ اولیه به تیکت جدید', trigger: 'event' as const, when: 'وقتی تیکت جدیدی ثبت شد', agent: 'support', enabled: true, lastRun: '۴ دقیقه پیش', lastStatus: 'ok' as const, runs: 1842 },
-  { id: 'au5', name: 'پایش قیمت رقبا', trigger: 'schedule' as const, when: 'دوشنبه و پنجشنبه ساعت ۱۰:۰۰', agent: 'marketing', enabled: false, lastRun: '۵ روز پیش', lastStatus: 'failed' as const, runs: 12 },
+  { id: 'au5', name: 'بررسی شکایت پرتکرار', trigger: 'event' as const, when: 'وقتی یک کالا در یک روز بیش از ۳ شکایت گرفت', agent: 'support', enabled: false, lastRun: '۵ روز پیش', lastStatus: 'failed' as const, runs: 12 },
 ];
 
 export const runHistory = [
-  { when: 'امروز ۰۷:۳۰', duration: '۲ دقیقه و ۱۴ ثانیه', status: 'ok' as const, note: '۴۱۲ تراکنش تطبیق شد', cost: 18_000 },
-  { when: 'دیروز ۰۷:۳۰', duration: '۲ دقیقه و ۴۰ ثانیه', status: 'ok' as const, note: '۳۸۷ تراکنش · ۱ مغایرت', cost: 21_000 },
-  { when: '۱۶ مهر ۰۷:۳۰', duration: '۵ دقیقه و ۰۲ ثانیه', status: 'approval' as const, note: 'مغایرت ۴٫۲ میلیونی نیاز به تأیید داشت', cost: 34_000 },
-  { when: '۱۵ مهر ۰۷:۳۰', duration: '۴۸ ثانیه', status: 'failed' as const, note: 'اتصال به بانک برقرار نشد', cost: 3_000 },
-  { when: '۱۴ مهر ۰۷:۳۰', duration: '۲ دقیقه و ۰۹ ثانیه', status: 'ok' as const, note: '۳۹۵ تراکنش تطبیق شد', cost: 17_000 },
+  { when: 'امروز ۱۱:۰۴', duration: '۴۲ ثانیه', status: 'ok' as const, note: 'پاسخ اولیه برای تیکت #۴۸۲۱ فرستاده شد', cost: 6_000 },
+  { when: 'امروز ۱۰:۵۱', duration: '۳۸ ثانیه', status: 'ok' as const, note: 'پاسخ اولیه برای تیکت #۴۸۲۰ فرستاده شد', cost: 5_000 },
+  { when: 'امروز ۰۹:۳۰', duration: '۱ دقیقه و ۱۰ ثانیه', status: 'approval' as const, note: 'درخواست بازگشت وجه نیاز به تأیید داشت', cost: 9_000 },
+  { when: 'دیروز ۱۷:۱۲', duration: '۱۲ ثانیه', status: 'failed' as const, note: 'اتصال به سامانهٔ تیکت برقرار نشد', cost: 1_000 },
+  { when: 'دیروز ۱۶:۴۰', duration: '۴۰ ثانیه', status: 'ok' as const, note: 'پاسخ اولیه برای تیکت #۴۸۱۷ فرستاده شد', cost: 6_000 },
 ];
 
 export const runStatus = {
@@ -434,7 +431,7 @@ export const decisions = [
 
 export const skills = [
   { id: 'sk1', name: 'گزارش هفتگی فروش', desc: 'خواندن دادهٔ فروش، مقایسه با هفتهٔ قبل و نوشتن گزارش با خلاصهٔ مدیریتی', layer: 'واحد فروش', agents: ['sales'], uses: 29, updated: '۱۲ مهر' },
-  { id: 'sk2', name: 'ساخت کمپین پیامکی', desc: 'انتخاب مخاطب، نوشتن متن طبق لحن برند و زمان‌بندی ارسال', layer: 'واحد مارکتینگ', agents: ['marketing'], uses: 14, updated: '۱۸ مهر' },
+  { id: 'sk2', name: 'ساخت کمپین پیامکی', desc: 'انتخاب مخاطب، نوشتن متن طبق لحن برند و تعیین زمان ارسال', layer: 'واحد مارکتینگ', agents: ['marketing'], uses: 14, updated: '۱۸ مهر' },
   { id: 'sk3', name: 'تطبیق بانکی', desc: 'تطبیق صورت‌حساب بانک با دفتر حسابداری و فهرست‌کردن مغایرت‌ها', layer: 'واحد مالی', agents: ['finance'], uses: 214, updated: '۲ مهر' },
   { id: 'sk4', name: 'پاسخ به تیکت', desc: 'پاسخ محترمانه طبق سیاست مرجوعی و ارجاع موارد حساس به انسان', layer: 'واحد پشتیبانی', agents: ['support'], uses: 1842, updated: '۲۰ مهر' },
   { id: 'sk5', name: 'نگارش با لحن برند', desc: 'قواعد نگارشی و لحن نیکان برای هر متن بیرونی', layer: 'سازمان', agents: ['marketing', 'support', 'sales'], uses: 96, updated: '۵ مهر' },
@@ -456,19 +453,7 @@ export const suggestions = [
   { id: 'su2', skill: 'ساخت کمپین پیامکی', reason: 'دو بار عبارت «لغو۱۱» را به انتهای متن پیامک اضافه کردید.', before: 'متن پیامک حداکثر ۷۰ نویسه باشد.', after: 'متن پیامک حداکثر ۷۰ نویسه باشد و با «لغو۱۱» تمام شود.' },
 ];
 
-export const layers = [
-  { id: 'org', name: 'سازمان', desc: 'برای همه اعمال می‌شود', skills: 4, rules: 6, memories: 12 },
-  { id: 'unit', name: 'واحد', desc: 'تنظیمات سازمان را دقیق‌تر می‌کند', skills: 11, rules: 5, memories: 23 },
-  { id: 'person', name: 'فرد', desc: 'ترجیح‌های شخصی شما', skills: 2, rules: 1, memories: 8 },
-];
-
 /* ───────────── Settings ───────────── */
-
-export const models = [
-  { value: 'Opus 5.5', label: 'Opus 5.5', hint: 'دقیق‌ترین' },
-  { value: 'Sonnet 5.5', label: 'Sonnet 5.5', hint: 'متعادل' },
-  { value: 'Haiku 5.5', label: 'Haiku 5.5', hint: 'سریع و ارزان' },
-];
 
 export const devices = [
   { id: 'dv1', name: 'لپ‌تاپ نیما', os: 'Windows 11', status: 'online' as const, mode: 'محلی', running: 2, last: 'همین حالا', current: true },
