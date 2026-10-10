@@ -91,7 +91,6 @@ async def go(
     limits: Limits | None = None,
     rubric: str | None = None,
     model: ModelSpec | None = None,
-    user: str = "نیما",
     resume: list[dict[str, Any]] | None = None,
     runner: Runner | None = None,
     fallback: ModelSpec | None = None,
@@ -105,7 +104,6 @@ async def go(
         mode=mode,  # type: ignore[arg-type]
         limits=limits or Limits(max_model_calls=25, max_seconds=240),
         rubric=rubric,
-        user_name=user,
         fallback_model=fallback,
     )
     stream = runner.resume(request, resume) if resume is not None else runner.start(request)

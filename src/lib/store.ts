@@ -28,6 +28,10 @@ type UiState = {
   /** Which settings section is open, so other screens can link straight to one. */
   settingsTab: SettingsTab;
   setSettingsTab: (tab: SettingsTab) => void;
+
+  /** The introduction, reopened on request (it opens by itself on first launch). */
+  introOpen: boolean;
+  setIntroOpen: (open: boolean) => void;
 };
 
 export const useUi = create<UiState>((set) => ({
@@ -45,4 +49,7 @@ export const useUi = create<UiState>((set) => ({
 
   settingsTab: 'general',
   setSettingsTab: (settingsTab) => set({ settingsTab }),
+
+  introOpen: false,
+  setIntroOpen: (introOpen) => set({ introOpen }),
 }));

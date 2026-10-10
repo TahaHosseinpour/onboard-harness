@@ -2,8 +2,7 @@ import { ChatsCircleIcon, CheckSquareOffsetIcon, FolderSimpleIcon, HouseIcon, Sl
 
 export type NavItem = { href: string; label: string; icon: Icon };
 
-// Only screens that are backed by the engine. Dashboards, goals and team return
-// here when they have real data behind them.
+// Every screen here is backed by the engine; nothing is a mock-up.
 export const navItems: NavItem[] = [
   { href: '/', label: 'خانه', icon: HouseIcon },
   { href: '/tasks', label: 'کارها', icon: ChatsCircleIcon },

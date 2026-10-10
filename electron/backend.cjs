@@ -28,7 +28,8 @@ function freePort() {
 /** How to launch the engine: the bundled executable when packaged, the project's virtualenv in development. */
 function command() {
   if (app.isPackaged) {
-    return { file: path.join(process.resourcesPath, 'backend', 'harness-server.exe'), args: [], cwd: path.join(process.resourcesPath, 'backend') };
+    const name = process.platform === 'win32' ? 'harness-server.exe' : 'harness-server';
+    return { file: path.join(process.resourcesPath, 'backend', name), args: [], cwd: path.join(process.resourcesPath, 'backend') };
   }
   const backend = path.join(__dirname, '..', 'backend');
   const python = path.join(backend, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
@@ -45,7 +46,10 @@ async function start() {
   connection.url = `http://127.0.0.1:${port}`;
   connection.token = crypto.randomBytes(24).toString('hex');
 
-  const log = fs.openSync(path.join(app.getPath('userData'), 'engine.log'), 'a');
+  const logFile = path.join(app.getPath('userData'), 'engine.log');
+  // One previous log is kept; the file never grows without end.
+  if (fs.existsSync(logFile) && fs.statSync(logFile).size > 5 * 1024 * 1024) fs.renameSync(logFile, `${logFile}.old`);
+  const log = fs.openSync(logFile, 'a');
   child = spawn(file, args, {
     cwd,
     env: { ...process.env, HARNESS_PORT: String(port), HARNESS_TOKEN: connection.token, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' },

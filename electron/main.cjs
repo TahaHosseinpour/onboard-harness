@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain, nativeTheme, protocol, shell } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeTheme, protocol, session, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -38,6 +38,8 @@ const CSP = [
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   "connect-src 'self' http://127.0.0.1:* http://localhost:*",
+  "media-src 'self' http://127.0.0.1:*", // sound and video are played straight from the engine
+  "frame-src 'self' blob:", // the files screen shows a PDF from the workspace in a frame
   "object-src 'none'",
   "base-uri 'self'",
 ].join('; ');
@@ -51,7 +53,7 @@ function resolveExport(requestUrl) {
   const pathname = decodeURIComponent(new URL(requestUrl).pathname);
   const base = path.join(OUT_DIR, pathname);
   // Refuse anything that climbs out of the export folder.
-  if (!base.startsWith(OUT_DIR)) return null;
+  if (base !== OUT_DIR && !base.startsWith(OUT_DIR + path.sep)) return null;
   const candidates = [base, `${base}.html`, path.join(base, 'index.html')];
   return candidates.find((file) => fs.existsSync(file) && fs.statSync(file).isFile()) ?? null;
 }
@@ -68,6 +70,44 @@ async function serveExport(request) {
   } catch {
     return new Response('Not found', { status: 404 });
   }
+}
+
+// Files that run when opened. An agent can write one into the workspace, so a click in
+// the files screen must never start it: these are shown in their folder instead.
+const RUNNABLE = new Set([
+  '.exe', '.com', '.scr', '.pif', '.cpl', '.msi', '.msp', '.msc', '.bat', '.cmd', '.ps1', '.psm1', '.vbs', '.vbe', '.js', '.jse', '.wsf', '.wsh', '.hta',
+  '.lnk', '.url', '.reg', '.jar', '.py', '.pyw', '.sh', '.command', '.app', '.desktop', '.appimage', '.dll', '.sys',
+]);
+
+/** The open workspace folder, asked from the engine: the page is not trusted to say where it is. */
+async function workspaceRoot() {
+  const { url, token } = engine.connection;
+  if (!url) return null;
+  try {
+    const response = await fetch(`${url}/workspace`, { headers: { Authorization: `Bearer ${token}` } });
+    const { path: root } = await response.json();
+    return root ? fs.realpathSync(root) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Open a workspace file with its own program. Returns '' when opened, otherwise why it was not. */
+async function openInWorkspace(target) {
+  const root = await workspaceRoot();
+  let file;
+  try {
+    file = fs.realpathSync(path.resolve(String(target)));
+  } catch {
+    return 'missing';
+  }
+  const inside = root && (file === root || (!path.relative(root, file).startsWith('..') && !path.isAbsolute(path.relative(root, file))));
+  if (!inside) return 'outside';
+  if (fs.statSync(file).isFile() && RUNNABLE.has(path.extname(file).toLowerCase())) {
+    shell.showItemInFolder(file);
+    return 'runnable';
+  }
+  return (await shell.openPath(file)) ? 'failed' : '';
 }
 
 function createWindow() {
@@ -88,6 +128,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      plugins: true, // Chromium's built-in PDF viewer, for the files screen
       devTools: !app.isPackaged,
     },
   });
@@ -100,6 +141,7 @@ function createWindow() {
     if (/^https?:/.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
+  win.webContents.on('will-attach-webview', (event) => event.preventDefault());
   win.webContents.on('will-navigate', (event, url) => {
     if (isInternal(url)) return;
     event.preventDefault();
@@ -125,6 +167,10 @@ app.whenReady().then(async () => {
 
   protocol.handle('app', serveExport);
 
+  // The app needs no camera, microphone, location or notifications; nothing is granted.
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
+
   // The engine starts first so the page knows its address; the page waits for it to answer.
   await engine.start();
   ipcMain.on('desktop:api', (event) => {
@@ -137,7 +183,7 @@ app.whenReady().then(async () => {
     });
     return result.canceled ? null : result.filePaths[0];
   });
-  ipcMain.handle('desktop:open-path', (_event, target) => shell.openPath(String(target)));
+  ipcMain.handle('desktop:open-path', (_event, target) => openInWorkspace(target));
 
   ipcMain.on('desktop:set-theme', (event, theme) => {
     const win = BrowserWindow.fromWebContents(event.sender);

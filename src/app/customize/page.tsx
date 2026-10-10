@@ -112,7 +112,7 @@ function Agents() {
     const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     if (!id) return toast.error('شناسهٔ ایجنت را با حروف لاتین بنویسید (مثلاً sales-analyst).');
     const path = `/.harness/agents/${id}.yaml`;
-    await api.put('/files/content', { path, content: `name: ${id}\ntitle: ایجنت جدید\ndescription: یک جمله که بگوید این ایجنت برای چه کاری است.\nprompt: |\n  نقش و روش کار این ایجنت را اینجا بنویسید.\ntools: [calculate, read_table, aggregate_table]\n` });
+    await api.put('/files/content', { path, content: `name: ${id}\ntitle: ایجنت جدید\ndescription: یک جمله که بگوید این ایجنت برای چه کاری است.\nprompt: |\n  نقش و روش کار این ایجنت را اینجا بنویسید.\ntools: [calculate, read_table, aggregate_table, add_table_rows, write_table, read_document, write_document]\n` });
     setName('');
     await connect();
     edit(path);
@@ -160,8 +160,12 @@ function Agents() {
 function RulesEditor() {
   const [rules, setRules] = useState<Rules | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [broken, setBroken] = useState<string | null>(null);
   useEffect(() => {
-    api.get<Rules>('/rules').then((data) => setRules({ files: data.files ?? [], tools: data.tools ?? {} }));
+    api.get<Rules & { error?: string }>('/rules').then((data) => {
+      setRules({ files: data.files ?? [], tools: data.tools ?? {} });
+      setBroken(data.error ?? null);
+    });
   }, []);
   if (!rules) return null;
 
@@ -173,6 +177,7 @@ function RulesEditor() {
     try {
       await api.put('/rules', rules);
       setDirty(false);
+      setBroken(null);
       toast.success('قوانین ذخیره شد و از کار بعدی اعمال می‌شود.');
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'ذخیره ممکن نشد.');
@@ -182,6 +187,11 @@ function RulesEditor() {
 
   return (
     <div className="space-y-6">
+      {broken && (
+        <p className="bg-danger-soft text-danger rounded-xl px-4 py-3 text-sm leading-7">
+          فایل قوانین این فضای کاری خراب است و تا درست نشود هیچ کاری شروع نمی‌شود. قوانین را از نو اینجا بسازید و ذخیره کنید، یا فایل <span className="ltr-nums font-mono">.harness/rules.yaml</span> را اصلاح کنید.
+        </p>
+      )}
       <div>
         <BlockLabel
           action={
@@ -220,7 +230,7 @@ function RulesEditor() {
       <div>
         <BlockLabel>ابزارها</BlockLabel>
         <RowGroup>
-          {Object.entries({ execute: rules.tools.execute ?? 'allow', ...rules.tools }).map(([tool, access]) => (
+          {Object.entries({ execute: rules.tools.execute ?? 'allow', browse_page: rules.tools.browse_page ?? 'ask', ...rules.tools }).map(([tool, access]) => (
             <Row key={tool} label={toolLabel[tool] ?? tool} description={<span className="ltr-nums font-mono">{tool}</span>}>
               <AccessPicker value={access} onChange={(value) => change({ ...rules, tools: { ...rules.tools, [tool]: value } })} />
             </Row>
@@ -230,7 +240,7 @@ function RulesEditor() {
 
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-xs">حالت «فقط خواندن» و «خودکار» در کادر پیام این قوانین را سخت‌تر یا آسان‌تر می‌کند؛ «ممنوع» همیشه ممنوع می‌ماند.</p>
-        <Button size="sm" disabled={!dirty} onClick={save}>
+        <Button size="sm" disabled={!dirty && !broken} onClick={save}>
           <FloppyDiskIcon /> ذخیرهٔ قوانین
         </Button>
       </div>

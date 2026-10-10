@@ -9,9 +9,9 @@ import { PageHeader } from '@/components/shell/page';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent } from '@/components/ui/overlays';
 import { BlockLabel, EmptyNote, navRow, Row, RowGroup, subNav, Table, TBody, Td, Th, THead, Tr } from '@/components/ui/patterns';
-import { Badge, Hint, Input, Label, Segmented, Switch } from '@/components/ui/primitives';
+import { Badge, Hint, Input, Label, PathText, Segmented, Switch } from '@/components/ui/primitives';
 import { api, ApiError, type Model } from '@/lib/api';
-import { useBackend } from '@/lib/backend';
+import { openOutside, useBackend } from '@/lib/backend';
 import { useUi, type SettingsTab } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +23,7 @@ const tabs: { id: SettingsTab; label: string; icon: Icon }[] = [
 
 function General() {
   const { theme, setTheme } = useTheme();
+  const setIntroOpen = useUi((s) => s.setIntroOpen);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   return (
@@ -39,6 +40,14 @@ function General() {
               { value: 'system', label: 'سیستم', icon: <LaptopIcon /> },
             ]}
           />
+        </Row>
+      </RowGroup>
+      <BlockLabel className="mt-6">راهنما</BlockLabel>
+      <RowGroup>
+        <Row label="راهنمای شروع" description="آنبورد هارنس چیست، چه کارهایی می‌شود سپرد و چطور فعال می‌شود">
+          <Button variant="outline" size="xs" onClick={() => setIntroOpen(true)}>
+            دوباره ببین
+          </Button>
         </Row>
       </RowGroup>
     </>
@@ -166,7 +175,7 @@ function Models() {
                   <span className="ltr-nums font-mono text-[0.8125rem]">{model.model}</span>
                 </Td>
                 <Td className="text-muted-foreground max-w-64">
-                  <span className="ltr-nums block truncate font-mono text-[0.8125rem]">{model.base_url}</span>
+                  <PathText path={model.base_url} className="text-[0.8125rem]" />
                 </Td>
                 <Td className="whitespace-nowrap">{model.base_url.startsWith('demo://') ? <span className="text-muted-foreground">لازم نیست</span> : model.has_key ? <Badge tone="success">ذخیره شده</Badge> : <Badge tone="warning">ندارد</Badge>}</Td>
                 <Td>
@@ -200,13 +209,32 @@ function Models() {
 
 function WorkspacePane() {
   const workspace = useBackend((s) => s.workspace);
+  const renameWorkspace = useBackend((s) => s.renameWorkspace);
+  const [name, setName] = useState(workspace?.name ?? '');
+  useEffect(() => setName(workspace?.name ?? ''), [workspace?.name]);
+
+  const rename = async () => {
+    try {
+      await renameWorkspace(name);
+      toast.success('نام فضای کاری عوض شد.');
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'تغییر نام ممکن نشد.');
+    }
+  };
+
   return (
     <>
       <BlockLabel>فضای کاری باز</BlockLabel>
       <RowGroup>
-        <Row label={workspace?.name} description={<span className="ltr-nums font-mono">{workspace?.path}</span>}>
-          <Button variant="outline" size="xs" onClick={() => (window.desktop?.openPath ? window.desktop.openPath(workspace?.path ?? '') : toast('فقط در برنامهٔ دسکتاپ ممکن است.'))}>
-            <ArrowSquareOutIcon /> نمایش در Explorer
+        <Row label="نام" description="فقط نامی که در برنامه می‌بینید عوض می‌شود، نه نام پوشه">
+          <Input className="h-8 w-56" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && rename()} />
+          <Button size="xs" disabled={!name.trim() || name.trim() === workspace?.name} onClick={rename}>
+            ذخیره
+          </Button>
+        </Row>
+        <Row label="پوشه" description={<PathText path={workspace?.path ?? ''} />}>
+          <Button variant="outline" size="xs" onClick={() => openOutside(workspace?.path ?? '', toast)}>
+            <ArrowSquareOutIcon /> باز کردن پوشه
           </Button>
         </Row>
       </RowGroup>

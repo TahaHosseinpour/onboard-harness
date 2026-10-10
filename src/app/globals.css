@@ -5,10 +5,40 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Vazirmatn (SIL Open Font License, see fonts/OFL.txt) ships with the app, so it
+   looks the same on every machine and needs no network. The FD variant draws
+   digits in their Persian form. */
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('./fonts/Vazirmatn-FD-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('./fonts/Vazirmatn-FD-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('./fonts/Vazirmatn-FD-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('./fonts/Vazirmatn-FD-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
-  /* IRANYekan is a licensed font, so it is not shipped in the repo: the app uses the copy
-     installed on the machine (FaNum variant: Persian digits) and falls back to system fonts. */
-  --font-sans: 'IRANYekanXFaNum', 'IRANYekanX', 'IRANYekan', 'Vazirmatn', 'Segoe UI', Tahoma, ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Vazirmatn FD', 'Segoe UI', Tahoma, ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
 
   --color-background: var(--background);
@@ -311,7 +341,7 @@
   color: var(--muted-foreground);
 }
 
-/* Tiptap document body */
+/* A document laid out for reading: Markdown, Word and PowerPoint files */
 .doc-prose {
   font-size: 15px;
   line-height: 2;
@@ -361,6 +391,92 @@
   border-color: var(--border);
 }
 
+.chat-prose {
+  font-size: inherit;
+  line-height: 1.85;
+}
+.chat-prose > :last-child {
+  margin-bottom: 0;
+}
+.chat-prose :is(p, ul, ol) {
+  margin: 0.45em 0;
+}
+.chat-prose h1 {
+  font-size: 1.25em;
+  margin: 0.9em 0 0.35em;
+}
+.chat-prose h2 {
+  font-size: 1.12em;
+  margin: 0.9em 0 0.35em;
+}
+.chat-prose h3 {
+  font-size: 1.02em;
+  margin: 0.8em 0 0.3em;
+}
+.chat-prose :is(th, code, pre) {
+  background: var(--background);
+}
+
+/* Each paragraph takes its own direction from its first letter, so a document
+   that mixes Persian and English lines up both correctly. */
+.doc-prose :is(p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote) {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+.doc-prose a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.doc-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--secondary);
+  border-radius: 6px;
+  padding: 0.1em 0.35em;
+}
+.doc-prose pre {
+  direction: ltr;
+  margin: 1em 0;
+  overflow-x: auto;
+  background: var(--secondary);
+  border-radius: 12px;
+  padding: 0.9em 1.1em;
+  line-height: 1.7;
+}
+.doc-prose pre code {
+  background: none;
+  padding: 0;
+}
+.doc-prose table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 1em 0;
+  border-collapse: collapse;
+  font-size: 0.9375em;
+  line-height: 1.7;
+}
+.doc-prose th,
+.doc-prose td {
+  border: 1px solid var(--border);
+  padding: 0.4em 0.8em;
+  text-align: start;
+}
+.doc-prose th {
+  background: var(--secondary);
+  font-weight: 600;
+}
+.doc-prose h6 {
+  margin: 0 0 0.6em;
+  font-size: 0.8em;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+.doc-prose img {
+  max-width: 100%;
+}
+
 /* Diff marks used in approvals and skill suggestions */
 .diff-add {
   background: var(--success-soft);
@@ -375,14 +491,4 @@
   border-radius: 4px;
   padding: 0 3px;
   text-decoration: line-through;
-}
-
-/* AG Grid picks up the app font and digits */
-.ag-root-wrapper {
-  font-family: var(--font-sans) !important;
-}
-
-/* Recharts: no focus rectangles around chart surfaces */
-.recharts-wrapper :focus {
-  outline: none;
 }

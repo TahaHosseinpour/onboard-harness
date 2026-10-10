@@ -28,8 +28,14 @@ def home() -> Path:
 
 def load() -> dict[str, Any]:
     file = home() / "settings.json"
-    data = json.loads(file.read_text(encoding="utf-8")) if file.exists() else {}
+    try:
+        data = json.loads(file.read_text(encoding="utf-8")) if file.exists() else {}
+    except (json.JSONDecodeError, OSError):
+        data = {}  # a damaged file must not keep the app from starting
+    if not isinstance(data, dict):
+        data = {}
     data.setdefault("workspaces", [])
+    data.setdefault("workspace_names", {})
     data.setdefault("current_workspace", None)
     data.setdefault("models", [_DEMO])
     data.setdefault("default_model", "demo")
@@ -37,7 +43,15 @@ def load() -> dict[str, Any]:
 
 
 def save(data: dict[str, Any]) -> None:
-    (home() / "settings.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    file = home() / "settings.json"
+    draft = file.with_suffix(".tmp")
+    draft.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(draft, file)  # all or nothing: a crash mid-write cannot leave half a file
+
+
+def workspace_name(data: dict[str, Any], path: str) -> str:
+    """The name the user gave a workspace; until they give one, its folder's name."""
+    return data["workspace_names"].get(path) or Path(path).name
 
 
 def model_spec(model_id: str | None) -> ModelSpec | None:

@@ -38,14 +38,19 @@ class AgentProfile:
 def list_agents(workspace: Workspace) -> list[AgentProfile]:
     profiles = []
     for file in sorted(workspace.agents_dir.glob("*.yaml")):
-        data = yaml.safe_load(file.read_text(encoding="utf-8")) or {}
+        try:
+            data = yaml.safe_load(file.read_text(encoding="utf-8")) or {}
+        except (yaml.YAMLError, OSError, UnicodeDecodeError):
+            continue  # a half-edited profile is skipped, not fatal to every run
+        if not isinstance(data, dict):
+            continue
         profiles.append(
             AgentProfile(
-                id=data.get("name", file.stem),
-                title=data.get("title", file.stem),
-                description=data.get("description", ""),
-                prompt=data.get("prompt", ""),
-                tools=list(data.get("tools") or []),
+                id=str(data.get("name") or file.stem),
+                title=str(data.get("title") or file.stem),
+                description=str(data.get("description") or ""),
+                prompt=str(data.get("prompt") or ""),
+                tools=[str(name) for name in data.get("tools") or []] if isinstance(data.get("tools"), list) else [],
             )
         )
     return profiles

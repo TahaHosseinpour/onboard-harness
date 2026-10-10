@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from harness.permissions import build_policy, load_rules
@@ -43,6 +45,32 @@ def test_table_tools_cannot_leave_the_workspace(workspace, tmp_path):
     result = build_tools(workspace)["read_table"].invoke({"path": "/../secret.csv"})
 
     assert result.startswith("Error:")
+
+
+def test_rows_are_added_to_csv_and_excel_without_touching_what_is_there(workspace):
+    from openpyxl import Workbook, load_workbook
+
+    add = build_tools(workspace)["add_table_rows"]
+    (workspace.root / "expenses.csv").write_text("date,title,amount\n1405/07/01,Rent,900", encoding="utf-8")
+    book = Workbook()
+    book.active.append(["date", "title", "amount"])
+    book.active.append(["1405/07/01", "Rent", 900])
+    book.active["E1"] = "=SUM(C:C)"
+    book.save(workspace.root / "expenses.xlsx")
+
+    for name in ("/expenses.csv", "/expenses.xlsx"):
+        assert add.invoke({"path": name, "rows": [{"date": "1405/07/12", "title": "تاکسی", "amount": 250}, {"title": "Lunch"}]}).startswith("Added 2 rows")
+        assert add.invoke({"path": name, "rows": [{"price": 1}]}).startswith("Error: no such columns: price")
+
+    assert (workspace.root / "expenses.csv").read_text(encoding="utf-8").splitlines() == ["date,title,amount", "1405/07/01,Rent,900", "1405/07/12,تاکسی,250", ",Lunch,"]
+    sheet = load_workbook(workspace.root / "expenses.xlsx").active
+    assert [cell.value for cell in sheet[3]][:3] == ["1405/07/12", "تاکسی", 250] and sheet["E1"].value == "=SUM(C:C)"
+    assert add.invoke({"path": "/../outside.csv", "rows": [{"a": 1}]}).startswith("Error:")
+
+
+def test_adding_rows_follows_the_file_rules_like_any_other_write(workspace):
+    assert _policy(workspace, "ask").decide("add_table_rows", {"path": "/expenses.xlsx", "rows": []}) == "ask"
+    assert _policy(workspace, "read_only").decide("add_table_rows", {"path": "/expenses.xlsx", "rows": []}) == "deny"
 
 
 # ── permissions ──
@@ -95,6 +123,48 @@ files:
     assert policy.decide("ls", {"path": "/secrets"}) == "deny"
     assert policy.decide("read_file", {"file_path": "/secrets/keys.txt"}) == "deny"
     assert policy.decide("ls", {"path": "/"}) == "allow"
+
+
+def test_a_rule_cannot_be_dodged_by_spelling_the_path_differently(workspace):
+    workspace.rules_file.write_text("files:\n  - {paths: ['/finance/**'], operations: [write], access: deny}\n", encoding="utf-8")
+    policy = _policy(workspace, "auto")
+
+    for spelling in ("/finance/budget.md", "finance/budget.md", "/notes/../finance/budget.md", "//finance/budget.md", "\\finance\\budget.md"):
+        assert policy.decide("write_file", {"file_path": spelling}) == "deny", spelling
+    if sys.platform != "linux":
+        assert policy.decide("write_file", {"file_path": "/Finance/budget.md"}) == "deny"
+
+
+def test_an_agent_never_changes_its_own_rules_without_approval(workspace):
+    workspace.rules_file.write_text("files:\n  - {paths: ['/**'], operations: [write], access: allow}\n", encoding="utf-8")
+
+    assert _policy(workspace, "auto").decide("write_file", {"file_path": "/.harness/rules.yaml"}) == "ask"
+    assert _policy(workspace, "auto").decide("delete", {"file_path": "/x/../.harness/rules.yaml"}) == "ask"
+    assert _policy(workspace, "read_only").decide("edit_file", {"file_path": "/.harness/rules.yaml"}) == "deny"
+
+
+def test_missing_or_broken_rules_never_mean_everything_is_allowed(workspace):
+    workspace.rules_file.unlink()
+    assert _policy(workspace, "ask").decide("execute", {"command": "dir"}) == "ask"
+
+    for broken in ("files: [unclosed", "just a sentence", "tools: {execute: sometimes}", "files:\n  - {access: allow}\n"):
+        workspace.rules_file.write_text(broken, encoding="utf-8")
+        with pytest.raises(ValueError):
+            load_rules(workspace.rules_file)
+
+
+def test_a_half_written_agent_or_skill_file_is_skipped(workspace):
+    (workspace.agents_dir / "broken.yaml").write_text("name: [unclosed", encoding="utf-8")
+    (workspace.skills_dir / "broken").mkdir()
+    (workspace.skills_dir / "broken" / "SKILL.md").write_text("---\nname: [unclosed\n---\nbody", encoding="utf-8")
+
+    assert [agent.id for agent in list_agents(workspace)] == ["analyst"]
+    assert {skill.id for skill in list_skills(workspace)} == {"weekly-report", "broken"}
+
+
+def test_a_task_id_is_a_plain_name(workspace):
+    with pytest.raises(ValueError):
+        workspace.run_dir("../outside")
 
 
 # ── guarded shell ──

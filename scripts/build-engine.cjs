@@ -16,8 +16,9 @@ if (!fs.existsSync(python)) {
 }
 
 // Packages that load parts of themselves by name at run time, which the packager cannot see on its own.
-const collectAll = ['deepagents', 'langchain', 'langchain_core', 'langgraph', 'langchain_openai', 'langchain_anthropic', 'langsmith', 'wcmatch', 'bracex'];
-const collectSubmodules = ['keyring', 'uvicorn', 'aiosqlite', 'openpyxl', 'tiktoken_ext'];
+// docx and pptx carry their blank templates as data files; playwright carries the driver that talks to the browser.
+const collectAll = ['deepagents', 'langchain', 'langchain_core', 'langgraph', 'langchain_openai', 'langchain_anthropic', 'langsmith', 'wcmatch', 'bracex', 'docx', 'pptx', 'playwright'];
+const collectSubmodules = ['keyring', 'uvicorn', 'aiosqlite', 'openpyxl', 'tiktoken_ext', 'pypdf', 'xlrd', 'olefile'];
 const metadata = ['deepagents', 'langchain', 'langchain-core', 'langgraph', 'langchain-openai', 'langchain-anthropic', 'keyring', 'openai', 'anthropic', 'pydantic'];
 const hidden = ['server.app', 'harness', 'win32ctypes.core', 'keyring.backends.Windows'];
 

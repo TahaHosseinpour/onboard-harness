@@ -213,7 +213,7 @@ async def test_memory_and_skills_reach_the_model_but_run_context_stays_out_of_th
             return super()._generate(messages, *args, **kwargs)
 
     monkeypatch.setattr("harness.core.build_chat_model", lambda spec: Recording(script=[AIMessage(content="سلام.")]))
-    await collect(runner.start(request(mode="auto", user_name="نیما")))
+    await collect(runner.start(request(mode="auto")))
 
     assert "Amounts are written in Toman" in seen["system"], "workspace memory is loaded"
     assert "weekly-report" in seen["system"], "skills are listed by name and description"

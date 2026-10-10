@@ -19,7 +19,7 @@ EventType = Literal[
     "tool_finished",
     "file_changed",
     "approval_required",  # the run is paused, waiting for a human
-    "approval_decided",  # a human answered: who, and what they decided
+    "approval_decided",  # the user answered: what they decided
     "verification",  # the stop hook sent the agent back to fix something
     "usage",
     "run_finished",

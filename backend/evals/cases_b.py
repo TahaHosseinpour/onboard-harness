@@ -437,19 +437,18 @@ note("16.2", A16, "بازپخش یک اجرای ناموفق برای دیباگ
 note("16.3", A16, "مجموعهٔ طلایی ۵۰ کار بیزینسی با نمره", "not_built", "وجود ندارد. آنچه هست: ۵۴ تست قطعی با مدل اسکریپت‌شده، و همین مجموعهٔ پذیرش که خودکار اجرا می‌شود و گزارش می‌دهد ولی نمره‌دهی و مقایسهٔ افت بین دو نسخه ندارد.")
 
 
-@case("16.4", A16, "Audit: چه کسی، چه چیزی، کِی، با تأیید چه کسی")
+@case("16.4", A16, "Audit: چه چیزی، کِی، با چه تصمیمی")
 async def audit_trail():
     world, ws = World(), new_workspace(rules=RULES_ASK_OUTBOUND)
-    first = await go(ws, "یک ایمیل با موضوع «سلام» به ali@nikan.shop بفرست.", mode="ask", thread="audit1", tools=world.tools(), user="نیما رستگار")
+    first = await go(ws, "یک ایمیل با موضوع «سلام» به ali@nikan.shop بفرست.", mode="ask", thread="audit1", tools=world.tools())
     if not first.pending:
         return "fail", f"برای تأیید متوقف نشد ({first.stop})."
-    await go(ws, "", mode="ask", thread="audit1", tools=world.tools(), user="مریم صادقی", resume=[{"type": "approve"}] * len(first.pending))
+    await go(ws, "", mode="ask", thread="audit1", tools=world.tools(), resume=[{"type": "approve"}] * len(first.pending))
     trace = read_trace(ws, "audit1")
-    who = next((e["data"].get("user") for e in trace if e["type"] == "run_started"), None)
-    decided = next((e["data"] for e in trace if e["type"] == "approval_decided"), None)
+    decided = next((e for e in trace if e["type"] == "approval_decided"), None)
     acted = next((e for e in trace if e["type"] == "tool_finished" and e["data"]["tool"] == "send_email"), None)
-    ok = who == "نیما رستگار" and decided and decided["by"] == "مریم صادقی" and acted and acted["data"]["ok"] and len(world.emails) == 1
-    return ("pass" if ok else "fail"), f"درخواست‌کننده: {who}؛ تأییدکننده: {decided and decided['by']} ({decided and decided['decisions'][0]['type']})؛ اقدام: send_email {'اجرا شد' if acted else 'ثبت نشد'}، با زمان ثبت‌شده؛ ایمیل در سرور آزمایشی: {len(world.emails)}. (نام کاربر را فراخواننده می‌دهد؛ احراز هویت وجود ندارد.)"
+    ok = decided and decided["data"]["decisions"][0]["type"] == "approve" and acted and acted["data"]["ok"] and acted["at"] >= decided["at"] and len(world.emails) == 1
+    return ("pass" if ok else "fail"), f"تصمیم کاربر: {decided and decided['data']['decisions'][0]['type']}؛ اقدام: send_email {'اجرا شد' if acted else 'ثبت نشد'}، هر دو با زمان ثبت‌شده؛ ایمیل در سرور آزمایشی: {len(world.emails)}. (برنامه تک‌کاربره است؛ تصمیم‌گیرنده همان کاربر سیستم است.)"
 
 
 note("16.5", A16, "هر باگ به یک تست جدید تبدیل شود", "not_testable", "این یک فرایند کاری است، نه قابلیت نرم‌افزار. زیرساختش (مجموعه‌تست و trace روی دیسک) هست.")

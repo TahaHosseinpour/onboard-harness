@@ -5,8 +5,8 @@ import { Providers } from './providers';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Onboard Harness',
-  description: 'سیستم‌عامل کاری سازمان شما',
+  title: 'آنبورد هارنس',
+  description: 'ایجنت شخصی روی سیستم خودتان، با مدل و کلید خودتان',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

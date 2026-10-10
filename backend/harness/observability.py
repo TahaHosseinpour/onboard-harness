@@ -40,6 +40,12 @@ class Tracer:
         (self.dir / "run.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
         return summary
 
+    def rename(self, title: str) -> None:
+        """Change the task's name without touching when it was last active."""
+        summary = self.read_summary()
+        if summary:
+            (self.dir / "run.json").write_text(json.dumps({**summary, "title": title}, ensure_ascii=False, indent=2), encoding="utf-8")
+
     def read_summary(self) -> dict[str, Any]:
         file = self.dir / "run.json"
         return json.loads(file.read_text(encoding="utf-8")) if file.exists() else {}

@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircleIcon, CircleDashedIcon, CircleNotchIcon, FileTextIcon, MagnifyingGlassIcon, SidebarSimpleIcon, StopIcon, WarningCircleIcon, XCircleIcon } from '@phosphor-icons/react';
+import { CheckCircleIcon, CircleDashedIcon, CircleNotchIcon, FileTextIcon, MagnifyingGlassIcon, SidebarSimpleIcon, WarningCircleIcon, XCircleIcon } from '@phosphor-icons/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 
 import { ApprovalCard } from '@/components/shared/approval-card';
 import { Composer } from '@/components/shared/composer';
+import { MarkdownView } from '@/components/shared/file-viewers';
+import { TaskMenu } from '@/components/shared/task-menu';
 import { Button } from '@/components/ui/button';
 import { ListRow, MetaDot, PanelCard, PlanRing } from '@/components/ui/patterns';
 import { Badge, Dot, Hint, Input } from '@/components/ui/primitives';
@@ -18,7 +20,7 @@ import { useRun, type Item, type Step, type Todo } from '@/lib/use-run';
 import { cn, fa } from '@/lib/utils';
 
 const userBubble = 'bg-primary text-primary-foreground max-w-[82%] rounded-3xl rounded-ee-lg px-4.5 py-2.5 leading-7 whitespace-pre-wrap';
-const agentBubble = 'bg-secondary max-w-[88%] rounded-3xl rounded-es-lg px-4.5 py-2.5 leading-7 whitespace-pre-wrap';
+const agentBubble = 'bg-secondary w-fit max-w-[88%] rounded-3xl rounded-es-lg px-4.5 py-2.5';
 
 const statusTone = { running: 'primary', waiting: 'warning', finished: 'neutral' } as const;
 
@@ -71,7 +73,13 @@ function Transcript({ items, running, onDecide }: { items: Item[]; running: bool
               <div className={userBubble} dir="auto">{item.text}</div>
             </div>
           );
-        if (item.kind === 'agent') return <div key={index} className={agentBubble} dir="auto">{item.text}</div>;
+        if (item.kind === 'agent')
+          return (
+            // Models answer in Markdown: headings, lists, tables and code are drawn, not shown as symbols.
+            <div key={index} className={agentBubble}>
+              <MarkdownView text={item.text} className="chat-prose" />
+            </div>
+          );
         if (item.kind === 'steps') return <Steps key={index} steps={item.steps} />;
         if (item.kind === 'approval') return item.open && !running ? <ApprovalCard key={index} actions={item.actions} onDecide={onDecide} /> : null;
         return (
@@ -217,7 +225,12 @@ function NewTask({ onSend }: { onSend: (text: string) => void }) {
                       )}
                     </>
                   }
-                  trailing={<Badge tone={run.status === 'waiting' ? 'warning' : run.status === 'running' ? 'primary' : run.stop_reason === 'completed' ? 'success' : 'neutral'}>{run.status === 'running' ? 'در حال اجرا' : stopReasonLabel[run.stop_reason ?? ''] ?? '—'}</Badge>}
+                  trailing={
+                    <>
+                      <Badge tone={run.status === 'waiting' ? 'warning' : run.status === 'running' ? 'primary' : run.stop_reason === 'completed' ? 'success' : 'neutral'}>{run.status === 'running' ? 'در حال اجرا' : stopReasonLabel[run.stop_reason ?? ''] ?? '—'}</Badge>
+                      <TaskMenu run={run} />
+                    </>
+                  }
                 />
               ))}
             </div>
@@ -268,11 +281,7 @@ export default function TasksPage() {
           </Badge>
           <div className="flex-1" />
           {summary?.mode && <span className="text-muted-foreground hidden text-xs lg:inline">{modeLabel[summary.mode].label}</span>}
-          {running && (
-            <Button variant="outline" size="sm" onClick={() => stop().catch(() => toast.error('توقف ممکن نشد.'))}>
-              <StopIcon weight="fill" /> توقف
-            </Button>
-          )}
+          {summary && <TaskMenu run={summary} />}
           <Hint label={showPanel ? 'بستن پنل کناری' : 'نمایش پنل کناری'}>
             <Button variant="muted" size="icon-sm" onClick={() => setShowPanel((v) => !v)} aria-label="پنل کناری">
               <SidebarSimpleIcon />
@@ -287,7 +296,7 @@ export default function TasksPage() {
         </div>
 
         <div className="mx-auto w-full max-w-2xl px-5 pb-4">
-          <Composer busy={running} onStop={() => stop().catch(() => {})} onSend={send} placeholder={waiting ? 'اول به درخواست تأیید بالا پاسخ بدهید…' : 'ادامه بدهید یا تغییری بخواهید…'} />
+          <Composer busy={running} onStop={() => stop().catch(() => toast.error('توقف ممکن نشد.'))} onSend={send} placeholder={waiting ? 'اول به درخواست تأیید بالا پاسخ بدهید…' : 'ادامه بدهید یا تغییری بخواهید…'} />
         </div>
       </Panel>
 

@@ -55,4 +55,3 @@ class RunRequest:
     fallback_model: ModelSpec | None = None
     # When set, the answer is graded against this text before the run may finish.
     rubric: str | None = None
-    user_name: str = ""

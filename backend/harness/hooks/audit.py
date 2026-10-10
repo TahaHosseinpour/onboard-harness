@@ -14,10 +14,9 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from langchain.agents.middleware import AgentMiddleware
+from ..permissions import WRITE_TOOLS, target_path
 from ..tracker import RunTracker
 from .outcome import tool_failed
-
-_FILE_TOOLS = {"write_file", "edit_file", "delete"}
 
 
 def _short(value: Any, limit: int = 300) -> Any:
@@ -45,6 +44,6 @@ class AuditHook(AgentMiddleware):
 
         output = result.content if isinstance(getattr(result, "content", None), str) else ""
         self.tracker.emit("tool_finished", tool=name, call_id=call_id, ok=not failed, ms=round((time.monotonic() - started) * 1000), output=_short(output, 1500), agent=self.agent)
-        if name in _FILE_TOOLS and not failed:
-            self.tracker.emit("file_changed", path=args.get("file_path") or args.get("path"), tool=name)
+        if name in WRITE_TOOLS and not failed:
+            self.tracker.emit("file_changed", path=target_path(name, args), tool=name)
         return result

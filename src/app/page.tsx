@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeftIcon, CheckSquareOffsetIcon } from '@phosphor-icons/react';
+import { ArrowLeftIcon, CheckSquareOffsetIcon, PlugsConnectedIcon } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -22,9 +22,13 @@ export default function HomePage() {
   const runs = useBackend((s) => s.runs);
   const startRun = useBackend((s) => s.startRun);
   const workspace = useBackend((s) => s.workspace);
+  const models = useBackend((s) => s.models);
+  const setSettingsTab = useUi((s) => s.setSettingsTab);
   const options = useUi((s) => s.runOptions);
   const setActiveThread = useUi((s) => s.setActiveThread);
   const waiting = waitingRuns(runs);
+  // Out of the box only the scripted demo model exists; real work needs the user's own.
+  const onlyDemo = models.every((model) => model.base_url.startsWith('demo://'));
 
   const open = (threadId: string) => {
     setActiveThread(threadId);
@@ -40,7 +44,7 @@ export default function HomePage() {
   };
 
   return (
-    <PageBody className="space-y-6 py-10">
+    <PageBody className="space-y-6 pt-28 pb-10">
       <section className="mx-auto max-w-3xl">
         <p className="text-muted-foreground text-center text-xs" suppressHydrationWarning>
           {jalaliToday()}
@@ -50,6 +54,20 @@ export default function HomePage() {
       </section>
 
       <div className="mx-auto grid max-w-3xl gap-4 pt-6">
+        {onlyDemo && (
+          <div className="bg-primary-soft flex items-center gap-3 rounded-2xl px-5 py-4">
+            <PlugsConnectedIcon className="text-primary size-6 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold">مدل خودتان را وصل کنید</div>
+              <p className="text-muted-foreground mt-0.5 text-xs leading-6">فعلاً فقط «مدل نمایشی» هست که یک کار نمونه را بازپخش می‌کند. برای کار واقعی، نشانی سرویس، کلید API و نام مدل خودتان را وارد کنید.</p>
+            </div>
+            <Button asChild size="sm">
+              <Link href="/settings" onClick={() => setSettingsTab('models')}>
+                تعریف مدل
+              </Link>
+            </Button>
+          </div>
+        )}
         {waiting.length > 0 && (
           <SectionCard
             title="منتظر تأیید شما"

@@ -16,6 +16,7 @@ state stays checkpointed, and `resume` picks it up - minutes or days later.
 from __future__ import annotations
 
 import asyncio
+import shutil
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
@@ -79,6 +80,14 @@ class Runner:
     def is_running(self, thread_id: str) -> bool:
         return thread_id in self._active
 
+    async def delete(self, thread_id: str) -> None:
+        """Forget a task: its conversation, trace and saved state. Files it made in the workspace stay."""
+        if self.is_running(thread_id):
+            raise RuntimeError("the task is still running")
+        async with open_checkpointer(self.workspace) as checkpointer:
+            await checkpointer.adelete_thread(thread_id)
+        shutil.rmtree(self.workspace.run_dir(thread_id), ignore_errors=True)
+
     # ── internals ──
 
     async def _stream(self, request: RunRequest, graph_input: Any, title: str | None = None, decisions: list[Decision] | None = None) -> AsyncIterator[Event]:
@@ -98,11 +107,13 @@ class Runner:
         async def work() -> None:
             pending: list[dict[str, Any]] = []
             error: str | None = None
-            tracker.emit("run_started", mode=request.mode, model=request.model.model, agent=request.agent_id, user=request.user_name, prompt=title)
+            tracker.emit("run_started", mode=request.mode, model=request.model.model, agent=request.agent_id, prompt=title)
             if decisions is not None:
-                # Who answered a pending approval, and how: the audit trail of human decisions.
-                tracker.emit("approval_decided", by=request.user_name, decisions=[{"type": d.get("type"), "message": d.get("message"), "edited": d.get("edited_action")} for d in decisions])
-            tracer.write_summary(status="running", pending=[], mode=request.mode, model_id=request.model.id, agent_id=request.agent_id, **({"title": title} if title else {}))
+                # How the pending approval was answered: the audit trail of human decisions.
+                tracker.emit("approval_decided", decisions=[{"type": d.get("type"), "message": d.get("message"), "edited": d.get("edited_action")} for d in decisions])
+            # The first message names the task. Later messages (and a name the user chose) do not replace it.
+            named = {"title": title} if title and not tracer.read_summary().get("title") else {}
+            tracer.write_summary(status="running", pending=[], mode=request.mode, model_id=request.model.id, agent_id=request.agent_id, **named)
             try:
                 async with open_checkpointer(self.workspace) as checkpointer:
                     agent = build_agent(self.workspace, request, tracker, checkpointer, self.extra_tools)

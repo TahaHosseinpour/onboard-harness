@@ -196,6 +196,19 @@ export function Hint({
 
 /* ───────────── Segmented control ───────────── */
 
+/** A folder or file path on one line. When it does not fit, the beginning is cut and the
+ *  end stays visible (the part that tells paths apart); hovering shows all of it. */
+export function PathText({ path, className }: { path: string; className?: string }) {
+  return (
+    <Hint label={<span dir="ltr" className="block max-w-[32rem] font-mono text-xs break-all">{path}</span>}>
+      {/* A right-to-left box clips on the left, which is where a path begins. */}
+      <span dir="rtl" className={cn('block min-w-0 truncate font-mono', className)}>
+        <bdi dir="ltr">{path}</bdi>
+      </span>
+    </Hint>
+  );
+}
+
 export function Segmented<T extends string>({
   value,
   onChange,

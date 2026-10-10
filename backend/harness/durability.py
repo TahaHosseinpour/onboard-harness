@@ -23,7 +23,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from .workspace import Workspace
 
 # Repeating these cannot change anything, so retrying them is always safe.
-READ_ONLY_TOOLS = ["ls", "read_file", "glob", "grep", "read_table", "aggregate_table", "calculate"]
+READ_ONLY_TOOLS = ["ls", "read_file", "glob", "grep", "read_table", "aggregate_table", "calculate", "read_document", "list_archive"]
 
 
 @asynccontextmanager

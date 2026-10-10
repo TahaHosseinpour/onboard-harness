@@ -7,10 +7,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { TaskMenu } from '@/components/shared/task-menu';
 import { Button } from '@/components/ui/button';
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger, Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlays';
 import { navRow } from '@/components/ui/patterns';
-import { Dot, Hint, Kbd } from '@/components/ui/primitives';
+import { Dot, Hint, Kbd, PathText } from '@/components/ui/primitives';
 import { ApiError } from '@/lib/api';
 import { toolLabel, useBackend, waitingRuns } from '@/lib/backend';
 import { useUi } from '@/lib/store';
@@ -60,10 +61,13 @@ function WorkspaceSwitcher({ open }: { open: boolean }) {
       </MenuTrigger>
       <MenuContent align="start" className="w-72">
         <MenuLabel>فضاهای کاری این سیستم</MenuLabel>
-        {(workspace?.known ?? []).map((path) => (
-          <MenuItem key={path} className="h-auto py-1.5" onSelect={() => path !== workspace?.path && switchTo(path)}>
-            <span className="ltr-nums min-w-0 flex-1 truncate text-end font-mono text-xs">{path}</span>
-            {path === workspace?.path && <CheckIcon className="text-primary!" />}
+        {(workspace?.known ?? []).map((known) => (
+          <MenuItem key={known.path} className="h-auto py-1.5" onSelect={() => known.path !== workspace?.path && switchTo(known.path)}>
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block truncate">{known.name}</span>
+              <PathText path={known.path} className="text-muted-foreground text-[11px]" />
+            </span>
+            {known.path === workspace?.path && <CheckIcon className="text-primary!" />}
           </MenuItem>
         ))}
         <MenuSeparator />
@@ -185,9 +189,9 @@ export function AppSidebar({ open }: { open: boolean }) {
             </button>
             <ul className={cn('flex flex-col gap-0.5', !recentOpen && 'hidden')}>
               {runs.slice(0, 12).map((run) => (
-                <li key={run.thread_id}>
+                <li key={run.thread_id} className="group/task relative">
                   <button
-                    className={cn(navRow, 'font-normal')}
+                    className={cn(navRow, 'pe-9 font-normal')}
                     data-active={pathname.startsWith('/tasks') && activeThread === run.thread_id}
                     onClick={() => {
                       setActiveThread(run.thread_id);
@@ -197,6 +201,9 @@ export function AppSidebar({ open }: { open: boolean }) {
                     <Dot tone={runTone[run.status]} pulse={run.status === 'running'} className="mx-1.5 size-2" />
                     <span className="flex-1 truncate text-start">{run.title || 'کار بدون عنوان'}</span>
                   </button>
+                  <span className="absolute end-1 top-1/2 -translate-y-1/2">
+                    <TaskMenu run={run} className="opacity-0 group-hover/task:opacity-100 focus-visible:opacity-100" />
+                  </span>
                 </li>
               ))}
             </ul>

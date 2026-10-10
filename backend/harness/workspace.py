@@ -20,12 +20,16 @@ they cannot reach above it through the file tools.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 HARNESS_DIR = ".harness"
 
-_DEFAULT_RULES = """\
+# A task's id is also its folder name under `runs/`, so it may only be a plain name.
+THREAD_ID = r"^[A-Za-z0-9_-]{1,64}$"
+
+DEFAULT_RULES = """\
 # What agents may do in this workspace.
 # access: allow (just do it) | ask (pause for approval) | deny (never)
 # The first matching rule wins.
@@ -41,6 +45,7 @@ files:
     access: ask
 tools:
   execute: ask
+  browse_page: ask
 """
 
 _DEFAULT_MEMORY = """\
@@ -59,7 +64,7 @@ description: Reads tables and reports in the workspace, calculates, and writes f
 prompt: |
   You analyse business data. State numbers with their source file, and use the
   calculation tools for every figure instead of doing arithmetic in your head.
-tools: [calculate, read_table, aggregate_table]
+tools: [calculate, read_table, aggregate_table, add_table_rows, write_table, read_document, write_document]
 """
 
 _DEFAULT_SKILL = """\
@@ -120,6 +125,8 @@ class Workspace:
         return self.harness / "state.db"
 
     def run_dir(self, thread_id: str) -> Path:
+        if not re.fullmatch(THREAD_ID, thread_id):
+            raise ValueError(f"not a valid task id: {thread_id!r}")
         return self.runs_dir / thread_id
 
     def virtual(self, path: Path) -> str:
@@ -139,7 +146,7 @@ class Workspace:
         for folder in (self.agents_dir, self.skills_dir, self.memory_dir, self.runs_dir, self.harness / "artifacts"):
             folder.mkdir(parents=True, exist_ok=True)
         defaults = {
-            self.rules_file: _DEFAULT_RULES,
+            self.rules_file: DEFAULT_RULES,
             self.memory_dir / "AGENTS.md": _DEFAULT_MEMORY,
             self.agents_dir / "analyst.yaml": _DEFAULT_AGENT,
             self.skills_dir / "weekly-report" / "SKILL.md": _DEFAULT_SKILL,
